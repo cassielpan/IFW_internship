@@ -41,4 +41,4 @@ df_all = pd.concat(df_list)
 df_all.head(3)    
 df_all.shape    
 
-df_all[["Project Name", "Name of the Company", "Thematic Area", "Project Budget", "Location"]].to_excel("/Users/zixin/Desktop/csr_data.xlsx", index=False)
+df_all[["Project Name", "Name of the Company", "Thematic Area", "Project Budget", "Location"]].to_excel("csr_data.xlsx", index=False)
