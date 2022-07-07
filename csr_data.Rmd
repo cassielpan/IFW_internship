@@ -1,0 +1,118 @@
+---
+title: "csr_project"
+author: "Zixin"
+date: "`r format(Sys.Date(), '%d/%m/%y')`"
+output:
+  html_document:
+    keep_md: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(haven)
+library(dplyr)
+library(readxl)
+library(ggplot2)
+library(scales)
+```
+
+
+```{r echo=T, message=FALSE, warning=FALSE, include=FALSE, results='hide'}
+csr_data_2014_15 <- read_excel("csr_data/csr_data_2014-15.xlsx")
+csr_data_2015_16 <- read_excel("csr_data/csr_data_2015-16.xlsx")
+csr_data_2016_17 <- read_excel("csr_data/csr_data_2016-17.xlsx")
+csr_data_2017_18 <- read_excel("csr_data/csr_data_2017-18.xlsx")
+csr_data_2018_19 <- read_excel("csr_data/csr_data_2018-19.xlsx")
+csr_data_2019_20 <- read_excel("csr_data/csr_data_2019-20.xlsx")
+csr_data_2020_21 <- read_excel("csr_data/csr_data_2020-21.xlsx")
+csr_data_2020_21 <- read_excel("csr_data/csr_data_2020-21.xlsx")
+csr_data_Ongoing <- read_excel("csr_data/csr_data_Ongoing.xlsx")
+csr_total<-rbind(csr_data_2014_15,csr_data_2015_16,csr_data_2016_17,csr_data_2017_18,csr_data_2018_19,csr_data_2019_20,csr_data_2020_21,csr_data_Ongoing)
+firm_name = Identitiy <- read.csv("Identity.csv", header = TRUE, sep = ";")
+csr_in_total <- read.csv("csr_in_total.csv")
+csr_in_total <- subset(csr_in_total, select = -X)
+csr_budget <- table <- aggregate(csr_in_total$Project.Budget,
+                                 by=list(csr_in_total$Thematic.Area), sum)
+```
+
+## Development  {.tabset}
+### over time
+```{r Plot 1, results='asis', message=FALSE, warning=FALSE}
+x <- ggplot(data = csr_total, aes(x= Year)) +
+   geom_bar(fill="skyblue", color="black") +
+  ylab("Observations") +
+  xlab("The number of projects for each year") +
+  scale_y_continuous(breaks = seq(0,6000,300)) +
+  theme_light() 
+x
+ggsave(
+    filename = "project.png", 
+    width = 5,             
+    height = 5,            
+    units = "in",          
+    dpi = 300           
+)
+```
+### by thematic area
+```{r Plot 2.1, results='asis', message=FALSE, warning=FALSE}
+x <- ggplot(data = csr_total, aes(x= `Thematic Area`)) +
+   geom_bar(fill="skyblue", color="black") +
+  ylab("Observations") +
+  xlab("Thematic Area") +
+  scale_x_discrete(labels = wrap_format(3))+
+  scale_y_continuous(breaks = seq(0,8000,500)) +
+  theme_light() 
+x
+ggsave(
+    filename = "Thematic Area.png", 
+    width = 12,             
+    height = 7,            
+    units = "in",          
+    dpi = 300           
+)
+
+```
+
+```{r}
+table(csr_total$`Thematic Area`)
+```
+
+```{r Plot 2.2,results='asis', message=FALSE, warning=FALSE}
+x <- ggplot(data = csr_total, aes(x= `Thematic Area`, fill = factor(`Year`))) +
+   geom_bar() +
+  ylab("Observations") +
+  xlab("The number of projects for each year") +
+  scale_x_discrete(labels = wrap_format(3))+
+  scale_y_continuous(breaks = seq(0,8000,500)) +
+  theme_light() 
+x
+ggsave(
+    filename = "Thematic Area (over years).png", 
+    width = 12,             
+    height = 7,            
+    units = "in",          
+    dpi = 300           
+)
+```
+
+
+```{r Plot 2.3,results='asis', message=FALSE, warning=FALSE}
+x <- ggplot(csr_budget, aes(x = Group.1, y = x)) +
+   geom_col(fill="skyblue", color="black") +
+  ylab("Budget (INR: Cr)") +
+  xlab("Thematic Area") +
+  scale_x_discrete(labels = wrap_format(3))+
+  scale_y_continuous(breaks=seq(0, 25000, 3000)) +
+  theme_light() 
+x
+ggsave(
+    filename = "Spend Distribution (over area).png", 
+    width = 12,             
+    height = 7,            
+    units = "in",          
+    dpi = 300           
+)
+```
+
+
+

@@ -1,0 +1,671 @@
+---
+title: "ghana_project"
+author: "Zixin"
+date: "`r format(Sys.Date(), '%d/%m/%y')`"
+output:
+  html_document:
+    keep_md: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(haven)
+library(dplyr)
+library(readxl)
+library(ggplot2)
+library(scales)
+library(pander)
+library(reshape2)
+library(sandwich)
+library(stargazer)
+library(tidyverse)
+library(jtools)
+```
+
+
+```{r echo=T, message=FALSE, warning=FALSE, include=FALSE, results='hide'}
+ACE_G <- read_dta("ghana_data/ACE_G.dta")
+data1 <- read_dta("ghana_data/ACE_G.dta", col_select = c(hid,b22i,b22ii,b22iii,b22iv,b22_a,b22b_1,b22b_2,b22b_3,b24a,b24b,b24c_1,b24c_2,b24c_3,b24c_4,b24d_1,b24d_2,b24d_3,b24d_4, b14e_1, b14e_2,c7c, c4,c5, c7a, c7b, c7c, c9a,c9b,c9c,c9d,c11a,c11b,c11c))
+
+```
+
+## Description
+### b22. Do you currently sell to any of the following groups? {.tabset}
+#### Government
+```{r r Plot 1.1, results='asis', message=FALSE, warning=FALSE}
+x <- ggplot(data = data1, aes(x= b22i)) +
+   geom_bar(fill="skyblue", color="black") +
+  ylab("Observations") +
+  xlab("Do you currently sell to the government?") +
+  scale_x_continuous(breaks=seq(1,2,1), labels = c("Yes", "No")) +
+  scale_y_continuous(breaks = seq(0,650,50)) +
+  theme_light() 
+x
+```
+
+#### End-customer
+```{r r Plot 1.2, results='asis', message=FALSE, warning=FALSE}
+x <- ggplot(data = data1, aes(x= b22ii)) +
+   geom_bar(fill="skyblue", color="black") +
+  ylab("Observations") +
+  xlab("Do you currently sell to the end-customer?") +
+  scale_x_continuous(breaks=seq(1,2,1), labels = c("Yes", "No")) +
+  scale_y_continuous(breaks = seq(0,650,50)) +
+  theme_light() 
+x
+```
+
+#### Another business or distributer, selling directly to the end-customer
+```{r r Plot 1.3, results='asis', message=FALSE, warning=FALSE}
+x <- ggplot(data = data1, aes(x= b22iii)) +
+   geom_bar(fill="skyblue", color="black") +
+  ylab("Observations") +
+  xlab("Do you currently sell to the another business or distributer, selling directly to the end-customer?") +
+  scale_x_continuous(breaks=seq(1,2,1), labels = c("Yes", "No")) +
+  scale_y_continuous(breaks = seq(0,650,50)) +
+  theme_light() 
+x
+```
+
+#### A buyer not selling to the end-customer, as the production chain is longer
+```{r r Plot 1.4, results='asis', message=FALSE, warning=FALSE}
+x <- ggplot(data = data1, aes(x= b22iv)) +
+   geom_bar(fill="skyblue", color="black") +
+  ylab("Observations") +
+  xlab("Do you currently sell to a buyer not selling to the end-customer, as the production chain is longer") +
+  scale_x_continuous(breaks=seq(1,2,1), labels = c("Yes", "No")) +
+  scale_y_continuous(breaks = seq(0,650,50)) +
+  theme_light() 
+x
+```
+
+
+### How many buyers do you have?
+```{r r Plot 2.1, results='asis', message=FALSE, warning=FALSE}
+x <- ggplot(data = data1, aes(x= b22_a)) +
+   geom_bar(fill="skyblue", color="black") +
+  ylab("Observations") +
+  xlab("How many buyers do you have?") +
+  scale_x_continuous(breaks=seq(1,3,1), labels = c("1 buyer", "2-5 buyers", "More than 5 buyers")) +
+  scale_y_continuous(breaks = seq(0,650,50)) +
+  theme_light() 
+x
+```
+
+### Where are they located?   {.tabset}
+```{r}
+sample1 <- subset(data1, select = c(hid,b22_a,b22b_1,b22b_2,b22b_3, b14e_1,b14e_2,c7c))
+#sample1 <- subset(data1, is.na(data1$b22b_1)==FALSE)
+# make 123 become 1, because they all mean yes
+sample1_clean <- sample1 %>%
+  mutate(district = b22b_1,
+         within_ghana = ifelse(b22b_2==2, 1, b22b_2),
+         outside_ghana = ifelse(b22b_3==3, 1, b22b_3)) %>%
+  select(!c(b22b_1,b22b_2,b22b_3))
+## combine district and within_ghana into one column
+sample1_merge <- sample1_clean %>%
+  mutate(district_or_within_ghana = ifelse(is.na(district), within_ghana, district)) %>%
+  select(!c(district,within_ghana))
+```
+
+#### only outside Ghana
+```{r r Plot 2.2, results='asis', message=FALSE, warning=FALSE}
+sample_outside_only <- subset(sample1_merge, is.na(district_or_within_ghana) == TRUE & outside_ghana == 1)
+x <- ggplot(data = sample_outside_only, aes(x= b22_a)) +
+   geom_bar(fill="skyblue", color="black") +
+  ylab("Observations") +
+  xlab("The distribution of selling only to outside Ghana") +
+  scale_x_continuous(breaks=seq(1,3,1), labels = c("1 buyer", "2-5 buyers", "More than 5 buyers")) +
+  scale_y_continuous(limits = c(0,475), breaks = seq(0, 475, by = 25)) +
+  theme_light() 
+x
+#table(sample_outside_only$b22_a)
+```
+
+The distribution of the number of female
+```{r}
+#table(sample_outside_only$b14e_1)
+pander(summary(sample_outside_only$b14e_1))
+```
+The distribution of the number of male
+```{r}
+#table(sample_outside_only$b14e_2)
+pander(summary(sample_outside_only$b14e_2))
+```
+The distribution of estimated sales in 2019
+```{r}
+#table(sample_outside_only$c7c)
+pander(summary(sample_outside_only$c7c))
+```
+
+
+#### only district
+```{r r Plot 2.3, results='asis', message=FALSE, warning=FALSE}
+sample_district <- subset(sample1_clean, is.na(outside_ghana) == TRUE & is.na(within_ghana) == TRUE & district == 1)
+x <- ggplot(data = sample_district, aes(x= b22_a)) +
+   geom_bar(fill="skyblue", color="black") +
+  ylab("Observations") +
+  xlab("The distribution of selling only to district") +
+  scale_x_continuous(breaks=seq(1,3,1), labels = c("1 buyer", "2-5 buyers", "More than 5 buyers")) +
+  scale_y_continuous(limits = c(0,475), breaks = seq(0, 475, by = 25)) +
+  theme_light() 
+x
+#table(sample_district$b22_a)
+```
+The distribution of the number of female
+```{r}
+#table(sample_district$b14e_1)
+pander(summary(sample_district$b14e_1))
+```
+The distribution of the number of male
+```{r}
+#table(sample_district$b14e_2)
+pander(summary(sample_district$b14e_2))
+```
+The distribution of estimated sales in 2019
+```{r}
+#table(sample_district$c7c)
+pander(summary(sample_district$c7c))
+```
+
+#### district and within Ghana
+```{r r Plot 2.5, results='asis', message=FALSE, warning=FALSE}
+sample_within <- subset(sample1_merge, is.na(outside_ghana) == TRUE & district_or_within_ghana == 1)
+x <- ggplot(data = sample_within, aes(x= b22_a)) +
+   geom_bar(fill="skyblue", color="black") +
+  ylab("Observations") +
+  xlab("The distribution of selling only to district or within Ghana") +
+  scale_x_continuous(breaks=seq(1,3,1), labels = c("1 buyer", "2-5 buyers", "More than 5 buyers")) +
+  scale_y_continuous(limits = c(0,475), breaks = seq(0, 475, by = 25)) +
+  theme_light() 
+x
+#table(sample_within$b22_a)
+```
+
+The distribution of the number of female
+```{r}
+#table(sample_within$b14e_1)
+pander(summary(sample_within$b14e_1))
+```
+The distribution of the number of male
+```{r}
+#table(sample_within$b14e_2)
+pander(summary(sample_within$b14e_2))
+```
+The distribution of estimated sales in 2019
+```{r}
+#table(sample_within$c7c)
+pander(summary(sample_within$c7c))
+```
+
+#### both to district_or_within and outside Ghana
+```{r r Plot 2.6, results='asis', message=FALSE, warning=FALSE}
+sample_both <- subset(sample1_merge, is.na(outside_ghana) == FALSE & is.na(district_or_within_ghana) == FALSE)
+x <- ggplot(data = sample_both, aes(x= b22_a)) +
+   geom_bar(fill="skyblue", color="black") +
+  ylab("Observations") +
+  xlab("The distribution of selling both to district_or_within Ghana and outside Ghana") +
+  scale_x_continuous(breaks=seq(2,3,1), labels = c("2-5 buyers", "More than 5 buyers")) +
+  scale_y_continuous(limits = c(0,475), breaks = seq(0, 475, by = 25)) +
+  theme_light() 
+x
+#table(sample_both$b22_a)
+```
+The distribution of the number of female
+```{r}
+#table(sample_both$b14e_1)
+pander(summary(sample_both$b14e_1))
+```
+The distribution of the number of male
+```{r}
+#table(sample_both$b14e_2)
+pander(summary(sample_both$b14e_2))
+```
+The distribution of estimated sales in 2019
+```{r}
+#table(sample_both$c7c)
+pander(summary(sample_both$c7c))
+```
+
+### b24.  I sell my product to……… {.tabset}
+```{r}
+sample_b24 <- subset(data1, 
+                     select=c(hid,b24a,b24b,b24c_1,b24c_2,b24c_3,b24c_4,
+                              b24d_1,b24d_2,b24d_3,b24d_4)) %>%
+              mutate(end_customer = ifelse(is.na(b24a)==TRUE, 2, 1),
+                     further_customer = ifelse(is.na(b24b)==TRUE, 2, 1),
+                     end_district = ifelse(is.na(b24c_1)==TRUE, 2, 1),
+                     end_within_ghana = ifelse(is.na(b24c_2)==TRUE, 2, 1),
+                     end_outside_ghana = ifelse(is.na(b24c_3)==TRUE, 2, 1),
+                     further_district = ifelse(is.na(b24d_1)==TRUE, 2, 1),
+                     further_within_ghana = ifelse(is.na(b24d_2)==TRUE, 2, 1),
+                     further_outside_ghana = ifelse(is.na(b24d_3)==TRUE, 2, 1))
+```
+
+#### End-customer (s)
+```{r r Plot 3.1, results='asis', message=FALSE, warning=FALSE}
+x <- ggplot(data = sample_b24, aes(x= end_customer)) +
+   geom_bar(fill="skyblue", color="black") +
+  ylab("Observations") +
+  xlab("I sell my product to End-customer (s)") +
+  scale_x_continuous(breaks=seq(1,2,1), labels = c("Yes", "No")) +
+  scale_y_continuous(limits = c(0,600), breaks = seq(0, 600, by = 50)) +
+  theme_light() 
+x
+```
+
+##### Where are they located? {.tabset}
+###### only district
+```{r r Plot 3.1.1, results='asis', message=FALSE, warning=FALSE}
+b24_district_only <- subset(sample_b24, end_outside_ghana == 2 & end_within_ghana == 2)
+x <- ggplot(data = b24_district_only, aes(x= end_district)) +
+   geom_bar(fill="skyblue", color="black") +
+  ylab("Observations") +
+  xlab("End-customer (s) are located only in your district.") +
+  scale_x_continuous(breaks=seq(1,2,1), labels = c("Yes", "No")) +
+  scale_y_continuous(limits = c(0,280),breaks = seq(0, 280, by = 20)) +
+  theme_light() 
+x
+```
+
+###### district and within Ghana
+```{r r Plot 3.1.2, results='asis', message=FALSE, warning=FALSE}
+b24_within <- subset(sample_b24, end_outside_ghana == 2 & end_district == 1)
+x <- ggplot(data = b24_within, aes(x= end_within_ghana)) +
+   geom_bar(fill="skyblue", color="black") +
+  ylab("Observations") +
+  xlab("End-customer (s) are located in both your district and another district within Ghana.") +
+  scale_x_continuous(breaks=seq(1,2,1), labels = c("Yes", "No")) +
+  scale_y_continuous(limits = c(0,280), breaks = seq(0, 280, by = 20)) +
+  theme_light() 
+x
+```
+
+###### only outside Ghana
+```{r r Plot 3.1.3, results='asis', message=FALSE, warning=FALSE}
+b24_outside_only <- subset(sample_b24, end_district == 2 & end_within_ghana == 2)
+x <- ggplot(data = b24_outside_only, aes(x= end_outside_ghana)) +
+   geom_bar(fill="skyblue", color="black") +
+  ylab("Observations") +
+  xlab("End-customer (s) are located only outside Ghana.") +
+  scale_x_continuous(breaks=seq(1,2,1), labels = c("Yes", "No")) +
+  scale_y_continuous(limits = c(0,280), breaks = seq(0, 280, by = 20)) +
+  theme_light() 
+x
+```
+
+###### both to district_or_within and outside Ghana
+```{r r Plot 3.1.4, results='asis', message=FALSE, warning=FALSE}
+b24_both <- subset(sample_b24, end_district == 1 & end_within_ghana == 1)
+x <- ggplot(data = b24_both, aes(x= end_outside_ghana)) +
+   geom_bar(fill="skyblue", color="black") +
+  ylab("Observations") +
+  xlab("End-customer (s) are located both to district_or_within and outside Ghana.") +
+  scale_x_continuous(breaks=seq(1,2,1), labels = c("Yes", "No")) +
+  scale_y_continuous(limits = c(0,280), breaks = seq(0, 280, by = 20)) +
+  theme_light() 
+x
+```
+
+#### Buyer(s) who sells to further customer
+```{r r Plot 3.2, results='asis', message=FALSE, warning=FALSE}
+x <- ggplot(data = sample_b24, aes(x= further_customer)) +
+   geom_bar(fill="skyblue", color="black") +
+  ylab("Observations") +
+  xlab("I sell my product to Buyer(s) who sells to further customer") +
+  scale_x_continuous(breaks=seq(1,2,1), labels = c("Yes", "No")) +
+  scale_y_continuous(limits = c(0,600), breaks = seq(0, 600, by = 50)) +
+  theme_light() 
+x
+```
+
+##### Where are they located? {.tabset}
+###### only district
+```{r r Plot 3.2.1, results='asis', message=FALSE, warning=FALSE}
+b24_district_only_f <- subset(sample_b24, further_outside_ghana == 2 & further_within_ghana == 2)
+x <- ggplot(data = b24_district_only_f, aes(x= further_district)) +
+   geom_bar(fill="skyblue", color="black") +
+  ylab("Observations") +
+  xlab("Buyers with further customers are located only in your district.") +
+  scale_x_continuous(breaks=seq(1,2,1), labels = c("Yes", "No")) +
+  scale_y_continuous(limits = c(0,400),breaks = seq(0, 400, by = 20)) +
+  theme_light() 
+x
+```
+
+###### district and within Ghana
+```{r r Plot 3.2.2, results='asis', message=FALSE, warning=FALSE}
+b24_within_f <- subset(sample_b24, further_outside_ghana == 2 & further_district == 1)
+x <- ggplot(data = b24_within_f, aes(x= further_within_ghana)) +
+   geom_bar(fill="skyblue", color="black") +
+  ylab("Observations") +
+  xlab("Buyers with further customers are located in both your district and another district within Ghana.") +
+  scale_x_continuous(breaks=seq(1,2,1), labels = c("Yes", "No")) +
+  scale_y_continuous(limits = c(0,400), breaks = seq(0, 400, by = 20)) +
+  theme_light() 
+x
+```
+
+###### only outside Ghana
+```{r r Plot 3.2.3, results='asis', message=FALSE, warning=FALSE}
+b24_outside_only_f <- subset(sample_b24, further_district == 2 & further_within_ghana == 2)
+x <- ggplot(data = b24_outside_only_f, aes(x= further_outside_ghana)) +
+   geom_bar(fill="skyblue", color="black") +
+  ylab("Observations") +
+  xlab("Buyers with further customers are located only outside Ghana.") +
+  scale_x_continuous(breaks=seq(1,2,1), labels = c("Yes", "No")) +
+  scale_y_continuous(limits = c(0,400), breaks = seq(0, 400, by = 20)) +
+  theme_light() 
+x
+```
+
+###### both to district_or_within and outside Ghana
+```{r r Plot 3.2.4, results='asis', message=FALSE, warning=FALSE}
+b24_both_f <- subset(sample_b24, further_district == 1 & further_within_ghana == 1)
+x <- ggplot(data = b24_both_f, aes(x= further_outside_ghana)) +
+   geom_bar(fill="skyblue", color="black") +
+  ylab("Observations") +
+  xlab("Buyers with further customers are located both to district_or_within and outside Ghana.") +
+  scale_x_continuous(breaks=seq(1,2,1), labels = c("Yes", "No")) +
+  scale_y_continuous(limits = c(0,400), breaks = seq(0, 400, by = 20)) +
+  theme_light() 
+x
+```
+
+### c4: Profit
+#### before covid-19
+```{r}
+pander(summary(data1$c4))
+```
+
+#### after covid-19
+```{r}
+pander(summary(data1$c5))
+```
+
+### c7: What estimated sales (in GHC) did this business make in
+#### 2020
+```{r}
+pander(summary(data1$c7a))
+```
+
+#### 2019
+```{r}
+pander(summary(data1$c7b))
+```
+
+#### 2018
+```{r}
+pander(summary(data1$c7c))
+```
+
+### c9: Beyond Ghana, in which markets did YOU sell? {.tabset}
+```{r}
+sample_market <- subset(data1, is.na(b22b_3) == FALSE, select = c(hid,b22b_3,c9a, c9b, c9c,c9d)) %>%
+                  mutate(market_1 = ifelse(is.na(c9a)==TRUE, 0, c9a),
+                         market_2 = ifelse(is.na(c9b)==TRUE, 0, c9b),
+                         market_3 = ifelse(is.na(c9c)==TRUE, 0, c9c),
+                         market_4 = ifelse(is.na(c9d)==TRUE, 0, c9d))
+```
+#### 1
+```{r r Plot 4.1.1, results='asis', message=FALSE, warning=FALSE}
+codes <- c("NA", "ECOWAS","Other Africa", "China", "India", 
+           "United States", "Europe", "Rest of World" )
+x <- ggplot(data = sample_market, aes(x= market_1)) +
+   geom_bar(fill="skyblue", color="black") +
+  ylab("Observations") +
+  xlab("Market 1") +
+  scale_x_continuous(breaks=seq(0,7,1), labels = codes) +
+  scale_y_continuous(breaks = seq(0,50,5)) +
+  theme_light() 
+x
+```
+
+#### 2
+```{r r Plot 4.1.2, results='asis', message=FALSE, warning=FALSE}
+x <- ggplot(data = sample_market, aes(x= market_2)) +
+   geom_bar(fill="skyblue", color="black") +
+  ylab("Observations") +
+  xlab("Market 2") +
+  scale_x_continuous(breaks=seq(0,7,1), labels = codes) +
+  scale_y_continuous(breaks = seq(0,50,5)) +
+  theme_light() 
+x
+```
+
+#### 3
+```{r r Plot 4.1.3, results='asis', message=FALSE, warning=FALSE}
+x <- ggplot(data = sample_market, aes(x= market_3)) +
+   geom_bar(fill="skyblue", color="black") +
+  ylab("Observations") +
+  xlab("Market 3") +
+  scale_x_continuous(breaks=seq(0,7,1), labels = codes) +
+  scale_y_continuous(breaks = seq(0,50,5)) +
+  theme_light() 
+x
+```
+
+#### 4
+```{r r Plot 4.1.4, results='asis', message=FALSE, warning=FALSE}
+x <- ggplot(data = sample_market, aes(x= market_4)) +
+   geom_bar(fill="skyblue", color="black") +
+  ylab("Observations") +
+  xlab("Market 4") +
+  scale_x_continuous(breaks=seq(0,7,1), labels = codes) +
+  scale_y_continuous(breaks = seq(0,50,5)) +
+  theme_light() 
+x
+```
+
+### c11: What are the THREE MOST IMPORTANT things you spend your business profit on? {.tabset}
+
+```{r}
+sample_important <- subset(data1, select = c(hid,c11a, c11b, c11c)) %>%
+                  mutate(thing_1 = ifelse(is.na(c11a)==TRUE, 0, c11a),
+                         thing_2 = ifelse(is.na(c11b)==TRUE, 0, c11b),
+                         thing_3 = ifelse(is.na(c11c)==TRUE, 0, c11c))
+```
+0=NA, 1=Paying of children’s school fees, 2=Healthcare, 3=Upkeep of the home, i.e. food,
+4=Re-investment in the business, 5=Invest in other business, 6=Savings (e.g. Bank/ Susu), 
+7= Loans to workers, 8 = Non-wage benefits for your workers, 9=Other (Specify
+
+#### 1
+```{r r Plot 5.1, results='asis', message=FALSE, warning=FALSE}
+x <- ggplot(data = sample_important, aes(x= thing_1)) +
+   geom_bar(fill="skyblue", color="black") +
+  ylab("Observations") +
+  xlab("Thing 1") +
+  scale_x_continuous(breaks=seq(1,9,1)) +
+  scale_y_continuous(breaks = seq(0,650,50)) +
+  theme_light() 
+x
+```
+
+#### 2
+```{r r Plot 5.2, results='asis', message=FALSE, warning=FALSE}
+x <- ggplot(data = sample_important, aes(x= thing_2)) +
+   geom_bar(fill="skyblue", color="black") +
+  ylab("Observations") +
+  xlab("Thing 2") +
+  scale_x_continuous(breaks=seq(0,9,1)) +
+  scale_y_continuous(breaks = seq(0,650,50)) +
+  theme_light() 
+x
+```
+
+#### 3
+```{r r Plot 5.3, results='asis', message=FALSE, warning=FALSE}
+x <- ggplot(data = sample_important, aes(x= thing_3)) +
+   geom_bar(fill="skyblue", color="black") +
+  ylab("Observations") +
+  xlab("Thing 3") +
+  scale_x_continuous(breaks=seq(0,9,1)) +
+  scale_y_continuous(breaks = seq(0,650,50)) +
+  theme_light() 
+x
+```
+
+### Certificate {.tabset}
+#### D8: Certification is a strategy used by some, but not all firms. 
+```{r message=FALSE, warning=FALSE}
+library(reshape2)
+certi <- subset(ACE_G, select = c(hid, 421:432, 439))
+certi <- certi %>% mutate_if(is.character, list(~na_if(.,"")))
+certi_dummy <- certi %>%
+  mutate(special = ifelse(is.na(d8a_11_sp)==TRUE, 2, 1)) %>%
+  select(!c(d8a_11_sp, d9))
+certi_melt <- melt(certi_dummy,  id.vars = 'hid', variable.name = 'certificate')
+certi_melt <- na.omit(certi_melt)
+certi_final <- certi_melt %>% 
+    group_by(hid) %>% 
+    summarise(value = min(value), .groups = 'drop')
+certi_final <- distinct(certi_final)
+
+```
+
+```{r r Plot 6.1, results='asis', message=FALSE, warning=FALSE}
+x <- ggplot(data = certi_final, aes(x= value)) +
+   geom_bar(fill="skyblue", color="black") +
+  ylab("Observations") +
+  xlab("Do you have a certificate?") +
+  scale_x_continuous(breaks=seq(1,2,1), labels = c("Yes", "No")) +
+  scale_y_continuous(breaks = seq(0,650,50)) +
+  theme_light() 
+x
+```
+
+#### D9:Does your firm have any certificate/code of conduct/agreement that is specific to your buyer?
+```{r r Plot 6.2, results='asis', message=FALSE, warning=FALSE}
+x <- ggplot(data = certi, aes(x= d9)) +
+   geom_bar(fill="skyblue", color="black") +
+  ylab("Observations") +
+  xlab("") +
+  scale_x_continuous(breaks=seq(1,2,1), labels = c("Yes", "No")) +
+  scale_y_continuous(breaks = seq(0,650,50)) +
+  theme_light() 
+x
+```
+
+### Regression {.tabset}
+```{r message=FALSE, warning=FALSE}
+reg_sample <- subset(ACE_G, select = c(hid,a5b,b22_a,b22b_3, b2, b6,b8a, b25a,b25b,
+                                       d6a, g1, c2a_1, c2a_2,c2a_3,c4,c7c, d9,
+                                       238:240, b24c_3, b24d_3)) %>%
+  mutate(outside = ifelse(b22b_3==3, 1, 0),
+         outside_ghana = ifelse(is.na(outside)==TRUE, 0, outside)) %>%
+  select(!c(b22b_3, outside))
+
+reg_sample$b24c_3[is.na(reg_sample$b24c_3) == TRUE] <- 0
+reg_sample$b24d_3[is.na(reg_sample$b24d_3) == TRUE] <- 0
+# invest
+re_invest <- subset(ACE_G, select = c(hid,c11a, c11b, c11c))
+re_invest_melt <- melt(re_invest,  id.vars = 'hid', variable.name = 'thing')
+re_invest_dummy <- re_invest_melt %>%
+  mutate(value = ifelse(is.na(value)==TRUE, 0, value),
+         re_invest = ifelse(value==4, 1, 0)) %>%
+  select(c(hid, re_invest))
+re_invest_dummy <- re_invest_dummy %>%
+  group_by(hid) %>% 
+  summarise_each(funs(max))
+
+# help from buyers and suppliers
+help <- subset(ACE_G, select = c(hid,199:205))
+help_melt <- melt(help,  id.vars = 'hid', variable.name = 'help')
+help_dummy <- help_melt %>%
+  mutate(value = ifelse(is.na(value)==TRUE, 0, value),
+         help = ifelse(value==0, 0, 1)) %>%
+  select(c(hid, help))
+help_dummy <- help_dummy %>%
+  group_by(hid) %>% 
+  summarise_each(funs(max))
+
+# business improvements
+improv <- subset(ACE_G, select = c(hid,183:190))
+improv$b16i_sp[improv$b16i_sp ==""]<-NA
+improv <- improv %>%
+  mutate(b16i_sp = ifelse(is.na(b16i_sp)==TRUE, 2, 1))
+improv_melt <- melt(improv,  id.vars = 'hid', variable.name = 'improv')
+improv_dummy <- improv_melt %>%
+  mutate(improv = ifelse(value==2, 0, 1)) %>%
+  select(c(hid, improv))
+improv_dummy <- improv_dummy %>%
+  group_by(hid) %>% 
+  summarise_each(funs(max))
+
+
+reg_sample <- left_join(reg_sample, re_invest_dummy, by = "hid")
+reg_sample <- left_join(reg_sample, help_dummy, by = "hid")
+reg_sample <- left_join(reg_sample, improv_dummy, by = "hid")
+reg_sample <- left_join(reg_sample, certi_final, by = "hid")
+names(reg_sample)[names(reg_sample) == 'value'] <- "certification"
+
+reg_sample <- reg_sample %>%
+  mutate(certificate = ifelse(is.na(certification)==TRUE, 0, certification)) %>%
+  select(!c(certification))
+
+reg_df <- reg_sample %>%
+  mutate(register = ifelse(b8a == 2, 0, b8a),
+         long_term_s = ifelse(b25a == 2, 0, b25a),
+         long_term_b = ifelse(b25b == 2, 0, b25b),
+         foreign_part = ifelse(d6a == 2, 0, d6a),
+         training = ifelse(g1 == 2, 0, g1),
+         certi = ifelse(certificate==2, 0, certificate),
+         certi_agree = ifelse(d9==2, 0, d9),
+         end = ifelse(b22ii==2, 0, b22ii),
+         intermediary = ifelse(b22iii==2,0, b22iii),
+         intermediary_long = ifelse(b22iv == 2, 0, b22iv),
+         end_outside_ghana = ifelse(b24c_3 ==3, 1, b24c_3),
+         inter_outside_ghana = ifelse(b24d_3 == 3, 1, b24d_3),
+         region = a5b,
+         buyers_number = b22_a) %>%
+  select(!c(b8a,b25a,b25b,d6a,g1,certificate, d9, b22ii,b22iii,b22iv, b24c_3,b24d_3,a5b,b22_a))
+reg_df <- transform(reg_df, sector_a = substr(b2, 1, 1), sector_b = substr(b2, 2, 4))
+reg_df <- na.omit(reg_df)
+```
+
+```{r message=FALSE, warning=FALSE}
+reg1 <- lm(c4/1000 ~ b6 + register + long_term_s + long_term_b + 
+             foreign_part + training + outside_ghana + help + end + intermediary +
+             intermediary_long + end_outside_ghana + inter_outside_ghana + 
+             factor(sector_a) +factor(region) + factor(buyers_number), data= reg_df)
+
+reg2 <- lm(c7c/1000 ~ b6 + register + long_term_s + long_term_b + 
+             foreign_part + training + outside_ghana + help+ end + intermediary +
+             intermediary_long + end_outside_ghana + inter_outside_ghana + 
+             factor(sector_a) +factor(region) + factor(buyers_number), data= reg_df)
+
+reg3 <- lm(certi ~ b6 + register + long_term_s + long_term_b + 
+             foreign_part + training + outside_ghana +help+end + intermediary +
+             intermediary_long + end_outside_ghana + inter_outside_ghana + 
+             factor(sector_a) +factor(region) + factor(buyers_number), data= reg_df)
+
+reg4 <- lm(certi_agree ~ b6 + register + long_term_s + long_term_b + 
+             foreign_part + training + outside_ghana +help+ end + intermediary +
+             intermediary_long + end_outside_ghana + inter_outside_ghana + 
+             factor(sector_a) +factor(region) + factor(buyers_number), data= reg_df)
+
+reg5 <- lm(re_invest ~ b6 + register + long_term_s + long_term_b + 
+             foreign_part + training + outside_ghana +help+ end + intermediary +
+             intermediary_long + end_outside_ghana + inter_outside_ghana + 
+             factor(sector_a) +factor(region) + factor(buyers_number), data= reg_df)
+
+reg6 <- lm(improv ~ b6 + register + long_term_s + long_term_b + 
+             foreign_part + training + outside_ghana + help+end + intermediary +
+             intermediary_long + end_outside_ghana + inter_outside_ghana + 
+             factor(sector_a) +factor(region) + factor(buyers_number), data= reg_df)
+```
+
+
+```{r message=FALSE, warning=FALSE, results='asis'}
+stargazer(reg1,reg2, reg3,reg4,reg5,reg6, type="html", column.sep.width = "4pt",
+          single.row = FALSE, font.size = "small",
+          dep.var.labels = c("Porfit before Covid<br>/1000","Sales<br>/1000",
+                             "Certificate<br>(dummy)", "Agreement of<br>Certificate(dummy)",                            "Re-investment<br>(dummy)","Improvment<br>(dummy)"),
+          covariate.labels= c("Size(1-3)", "Registeration(0-1)", "Long-term with Suppliers(0-1)",
+                              "Long-term with Buyers(0-1)", "Foreign Partners(0-1)",
+                              "Training(0-1)", "Outside Ghana(0-1)","Help", 
+                              "End-Customer(0-1)", "Intermediary(0-1)",
+                              "Intermediary-long(0-1)","End-customer outside Ghana(0-1)",
+                              "Intermediary outside Ghana(0-1)"),
+          column.separate = c(1,1,1,1,1,1))
+```
