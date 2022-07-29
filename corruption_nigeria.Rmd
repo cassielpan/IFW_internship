@@ -1,0 +1,1165 @@
+---
+title: "Corruption_Nigeria"
+author: "Zixin"
+date: "2022-07-26"
+output:
+  html_document:
+    keep_md: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+if(!require("haven")) {install.packages("haven"); library("haven")}
+if(!require("ggplot2")) {install.packages("ggplot2"); library("ggplot2")}
+if(!require("dplyr")) {install.packages("dplyr"); library("dplyr")}
+if(!require("reshape2")) {install.packages("reshape2"); library("reshape2")}
+
+```
+
+```{r}
+nigeria <- read_sav("afrobarometer_release-data_nig_r8_en_2021-03-31.sav", encoding = "latin1")
+```
+
+## Questions  {.tabset}
+
+### Q2.Language spoken in home
+What is the primary language you speak in your home now?
+
+```{r}
+q2 <- subset(nigeria, select=c("RESPNO","Q2", "withinwt_hh", "URBRUR"))
+#recode the answer
+q2$Q2[as.numeric(q2$Q2) == "-1"] <- NA
+
+q2 <- na.omit(q2)
+
+```
+
+
+```{r Plot 1, message=FALSE, warning=FALSE}
+cname <- c("English", "Hausa", "Igbo", "Yoruba", "Pidgin English", "Efik", "Ebira", "Fulani", "Isoko", "Ibibio", "Kanuri", "Tiv", "Nupe", "Ijaw", "Edo", "Igala", "Urhobo", "Ogoni", "Anang", "Ikwere", "Idoma", "Esan", "Karekare", "Berom", "Agatu", "Other", "Refused", "Don't know")
+p <- q2 %>%
+  group_by(Q2) %>%
+  summarise(urban = sum(withinwt_hh[as.numeric(URBRUR) == "1" ]),
+            rural = sum(withinwt_hh[as.numeric(URBRUR) == "2" ])) %>%
+  melt(id.vars='Q2') %>%
+  ggplot(aes(x = as.factor(Q2), y = value, fill = variable)) + 
+      geom_col(stat='identity', position="stack") +
+      scale_fill_manual(values = c("blue","red")) +
+      scale_x_discrete(labels = cname)+
+      scale_y_continuous(labels = scales::comma, expand = c(0,5))+
+      labs(title = "Language spoken in home",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.text.x = element_text(angle = 45, hjust=1),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+
+### Q39a. Tax authorities have right to enforce taxes
+For each of the following statements, please tell me whether you disagree or agree: The tax authorities always have the right to make people pay taxes.
+```{r}
+q39a <- subset(nigeria, select=c("RESPNO","Q39A","withinwt_hh"))
+#recode the answer
+q39a$Q39A[as.numeric(q39a$Q39A) == "-1"] <- NA
+q39a <- na.omit(q39a)
+```
+
+```{r Plot 2, message=FALSE, warning=FALSE}
+cname <- c("Strongly disagree", "Disagree", "Neither agree\nnor disagree", "Agree", "Strongly agree", "Don’t know")
+p <- q39a %>%
+  group_by(Q39A) %>%
+  summarise(number = sum(withinwt_hh)) %>%
+  ggplot(aes(x = as.factor(Q39A), y = number))+
+      geom_col(fill="blue", color="black") +
+      scale_x_discrete(labels = (cname))+
+      scale_y_continuous(expand = c(0,5))+
+      labs(title = "Tax authorities have right to enforce taxes",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+
+### Q41j. The tax/revenue office
+How much do you trust each of the following, or haven’t you heard enough about them to say: The Federal Inland Revenue Service or FIRS?
+```{r}
+q41j <- subset(nigeria, select=c("RESPNO","Q41J", "withinwt_hh"))
+#recode the answer
+q41j$Q41J[as.numeric(q41j$Q41J) == "-1"] <- NA
+
+q41j <- na.omit(q41j)
+```
+
+
+```{r Plot 3, message=FALSE, warning=FALSE}
+cname <- c("Not at all", "Just a little", "Somewhat", "A lot", "Refused", "Don’t know/Haven’t heard")
+p <- q41j %>%
+  group_by(Q41J) %>%
+  summarise(number = sum(withinwt_hh)) %>%
+  ggplot(aes(x = as.factor(Q41J), y = number))+
+      geom_col(fill="blue", color="black") +
+      scale_x_discrete(labels = (cname))+
+      scale_y_continuous(expand = c(0,5))+
+      labs(title = "The tax/revenue office",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+
+
+### Q42c. Corruption: Civil servants
+How many of the following people do you think are involved in corruption, or haven’t you heard enough about them to say: Civil servants?
+```{r}
+q42c <- subset(nigeria, select=c("RESPNO","Q42C", "withinwt_hh"))
+#recode the answer
+q42c$Q42C[as.numeric(q42c$Q42C) == "-1"] <- NA
+
+q42c <- na.omit(q42c)
+```
+
+
+```{r Plot 4, message=FALSE, warning=FALSE}
+cname <- c("None", "Some of them", "Most of them", "All of them", "Refused", "Don’t know/Haven’t heard")
+p <- q42c %>%
+  group_by(Q42C) %>%
+  summarise(number = sum(withinwt_hh)) %>%
+  ggplot(aes(x = as.factor(Q42C), y = number))+
+      geom_col(fill="blue", color="black") +
+      scale_x_discrete(labels = (cname))+
+      scale_y_continuous(expand = c(0,5))+
+      labs(title = "Corruption: Civil servants",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+
+
+### Q42g. Corruption: tax officials
+How many of the following people do you think are involved in corruption, or haven’t you heard enough about them to say: Tax officials like officials from the Federal Inland Revenue Service or FIRS?
+```{r}
+q42g <- subset(nigeria, select=c("RESPNO","Q42G", "withinwt_hh"))
+#recode the answer
+q42g$Q42G[as.numeric(q42g$Q42G) == "-1"] <- NA
+
+q42g <- na.omit(q42g)
+```
+
+
+```{r Plot 5, message=FALSE, warning=FALSE}
+cname <- c("None", "Some of them", "Most of them", "All of them", "Refused", "Don’t know/Haven’t heard")
+p <- q42g %>%
+  group_by(Q42G) %>%
+  summarise(number = sum(withinwt_hh)) %>%
+  ggplot(aes(x = as.factor(Q42G), y = number))+
+      geom_col(fill="blue", color="black") +
+      scale_x_discrete(labels = (cname))+
+      scale_y_continuous(expand = c(0,5))+
+      labs(title = "Corruption: tax officials",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+
+
+### Q43a. Level of corruption
+In your opinion, over the past year, has the level of corruption in this country increased, decreased, or stayed the same?
+```{r}
+q43a <- subset(nigeria, select=c("RESPNO","Q43A", "withinwt_hh"))
+#recode the answer
+q43a$Q43A[as.numeric(q43a$Q43A) == "-1"] <- NA
+
+q43a <- na.omit(q43a)
+```
+
+
+```{r Plot 6, message=FALSE, warning=FALSE}
+cname <- c("Increased \na lot", "Increased \nsomewhat", "Stayed \nthe same", "Decreased \nsomewhat", "Decreased \na lot", "Don’t \nknow")
+p <- q43a %>%
+  group_by(Q43A) %>%
+  summarise(number = sum(withinwt_hh)) %>%
+  ggplot(aes(x = as.factor(Q43A), y = number))+
+      geom_col(fill="blue", color="black") +
+      scale_x_discrete(labels = (cname))+
+      scale_y_continuous(expand = c(0,5))+
+      labs(title = "Level of corruption",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+
+### Q43b. Ordinary people can report corruption without fear
+In this country, can ordinary people report incidents of corruption without fear, or do they risk retaliation or other negative consequences if they speak out?
+```{r}
+q43b <- subset(nigeria, select=c("RESPNO","Q43B", "withinwt_hh"))
+#recode the answer
+q43b$Q43B[as.numeric(q43b$Q43B) == "-1"] <- NA
+
+q43b <- na.omit(q43b)
+```
+
+
+```{r Plot 7, message=FALSE, warning=FALSE}
+cname <- c("Can report \nwithout fear", "Risk retaliation or \nother negative consequences", "Refused", "Don’t know")
+p <- q43b %>%
+  group_by(Q43B) %>%
+  summarise(number = sum(withinwt_hh)) %>%
+  ggplot(aes(x = as.factor(Q43B), y = number))+
+      geom_col(fill="blue", color="black") +
+      scale_x_discrete(labels = (cname))+
+      scale_y_continuous(expand = c(0,10))+
+      labs(title = "Ordinary people can report corruption without fear",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+
+
+### Q44i. Pay bribe for identity document
+And how often, if ever, did you have to pay a bribe, give a gift, or do a favour for a government official in order to get the document you needed?
+```{r}
+q44i <- subset(nigeria, select=c("RESPNO","Q44I", "withinwt_hh"))
+#recode the answer
+q44i$Q44I[as.numeric(q44i$Q44I) == "-1"] <- NA
+
+q44i <- na.omit(q44i)
+```
+
+
+```{r Plot 8, message=FALSE, warning=FALSE}
+cname <- c("Never", "Once or twice", "A few times", "Often", "No contact", "Don’t know")
+p <- q44i %>%
+  group_by(Q44I) %>%
+  summarise(number = sum(withinwt_hh)) %>%
+  ggplot(aes(x = as.factor(Q44I), y = number))+
+      geom_col(fill="blue", color="black") +
+      scale_x_discrete(labels = (cname))+
+      scale_y_continuous(expand = c(0,10))+
+      labs(title = "Pay bribe for identity document",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+
+
+### Q48 Most important problems
+In your opinion, what are the most important problems facing this country that government should address?
+```{r}
+q48 <- subset(nigeria, select = c("RESPNO","Q48PT1","Q48PT2", "Q48PT3","withinwt_hh")) %>%
+  mutate(a = ifelse(as.numeric(Q48PT1) == 24, 1, 0),
+         b = ifelse(as.numeric(Q48PT2) == 24, 1, 0),
+         c = ifelse(as.numeric(Q48PT3) == 24, 1, 0))
+         
+q48a <- q48 %>%
+  group_by(a) %>%
+  summarise(number = sum(withinwt_hh)) %>%
+  mutate(perc = `number` / sum(`number`)) %>% 
+  arrange(perc) %>%
+  mutate(labels = scales::percent(perc))
+ 
+q48b <- q48 %>%
+  group_by(b) %>%
+  summarise(number = sum(withinwt_hh)) %>%
+  mutate(perc = `number` / sum(`number`)) %>% 
+  arrange(perc) %>%
+  mutate(labels = scales::percent(perc)) 
+
+q48c <- q48 %>%
+  group_by(c) %>%
+  summarise(number = sum(withinwt_hh)) %>%
+  mutate(perc = `number` / sum(`number`)) %>% 
+  arrange(perc) %>%
+  mutate(labels = scales::percent(perc)) 
+```
+
+#### Q48pt1. Most important problems – 1st response
+```{r Plot 9.1, results='asis', message=FALSE, warning=FALSE}
+p <- ggplot(q48a, aes(x = "", y = perc, fill= factor(a))) +
+  geom_col() +
+  ggtitle("Most important problems – 1st response")+
+  geom_text(aes(label = labels),
+            position = position_stack(vjust = 0.5)) +
+  coord_polar(theta = "y")+
+  theme_void()+
+  scale_fill_manual(values=c("cadetblue3", "azure2"),
+                    name ="", 
+                     labels = c("Others", "Corruption"))
+p
+```
+
+#### Q48pt2. Most important problems – 2nd response
+```{r Plot 9.2, results='asis', message=FALSE, warning=FALSE}
+p <- ggplot(q48b, aes(x = "", y = perc, fill= factor(b))) +
+  geom_col() +
+  ggtitle("Most important problems – 2nd response")+
+  geom_text(aes(label = labels),
+            position = position_stack(vjust = 0.5)) +
+  coord_polar(theta = "y")+
+  theme_void()+
+  scale_fill_manual(values=c("cadetblue3", "azure2"),
+                    name ="", 
+                     labels = c("Others", "Corruption"))
+p
+```
+
+#### Q48pt3. Most important problems – 3rd response
+```{r Plot 9.3, results='asis', message=FALSE, warning=FALSE}
+p <- ggplot(q48c, aes(x = "", y = perc, fill= factor(c))) +
+  geom_col() +
+  ggtitle("Most important problems – 3rd response")+
+  geom_text(aes(label = labels),
+            position = position_stack(vjust = 0.5)) +
+  coord_polar(theta = "y")+
+  theme_void()+
+  scale_fill_manual(values=c("cadetblue3", "azure2"),
+                    name ="", 
+                     labels = c("Others", "Corruption"))
+p
+```
+
+### Q65a. Know if country receives assistance from China
+To your knowledge, does China give loans or development assistance to our country’s government, or haven’t you had a chance to hear about this?
+```{r}
+q65a <- subset(nigeria, select=c("RESPNO","Q65A", "withinwt_hh"))
+#recode the answer
+q65a$Q65A[as.numeric(q65a$Q65A) == "-1"] <- NA
+
+q65a <- na.omit(q65a)
+```
+
+
+```{r Plot 10, message=FALSE, warning=FALSE}
+cname <- c("No", "Yes", "Refused", "Don’t know")
+p <- q65a %>%
+  group_by(Q65A) %>%
+  summarise(number = sum(withinwt_hh)) %>%
+  ggplot(aes(x = as.factor(Q65A), y = number))+
+      geom_col(fill="blue", color="black") +
+      scale_x_discrete(labels = (cname))+
+      scale_y_continuous(expand = c(0,5))+
+      labs(title = "Know if country receives assistance from China",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+### Q65b. Government required to repay China for loans
+Do you think that our government is required to repay China for the loans and development assistance it provides to Nigeria, or haven’t you heard enough to say?
+```{r}
+q65b <- subset(nigeria, select=c("RESPNO","Q65B", "withinwt_hh"))
+#recode the answer
+q65b$Q65B[as.numeric(q65b$Q65B) == "-1"] <- NA
+
+q65b <- na.omit(q65b)
+```
+
+
+```{r Plot 11, message=FALSE, warning=FALSE}
+cname <- c("No", "Yes","Not applicable",  "Don’t know")
+p <- q65b %>%
+  group_by(Q65B) %>%
+  summarise(number = sum(withinwt_hh)) %>%
+  ggplot(aes(x = as.factor(Q65B), y = number))+
+      geom_col(fill="blue", color="black") +
+      scale_x_discrete(labels = (cname))+
+      scale_y_continuous(expand = c(0,5))+
+      labs(title = "Government required to repay China for loans",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+### Q64c. Government borrowed too much money from China
+Do you think our government has borrowed too much money from China, or haven’t you heard enough to say?
+```{r}
+q65c <- subset(nigeria, select=c("RESPNO","Q65C", "withinwt_hh"))
+#recode the answer
+q65c$Q65C[as.numeric(q65c$Q65C) == "-1"] <- NA
+
+q65c <- na.omit(q65c)
+```
+
+
+```{r Plot 12, message=FALSE, warning=FALSE}
+cname <- c("No", "Yes","Not applicable", "Refused", "Don’t know")
+p <- q65c %>%
+  group_by(Q65C) %>%
+  summarise(number = sum(withinwt_hh)) %>%
+  ggplot(aes(x = as.factor(Q65C), y = number))+
+      geom_col(fill="blue", color="black") +
+      scale_x_discrete(labels = (cname))+
+      scale_y_continuous(expand = c(0,10))+
+      labs(title = "Government borrowed too much money from China",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+### Q65d.China puts more or less conditions on assistance
+When the government of China gives loans or development assistance to Nigeria, do you think they put more requirements or fewer requirements on our government compared to other donor countries, or haven’t you heard enough to say?
+```{r}
+q65d <- subset(nigeria, select=c("RESPNO","Q65D", "withinwt_hh"))
+#recode the answer
+q65d$Q65D[as.numeric(q65d$Q65D) == "-1"] <- NA
+
+q65d <- na.omit(q65d)
+```
+
+
+```{r Plot 13, message=FALSE, warning=FALSE}
+cname <- c("Far \nfewer \nrequirements", "Somewhat \nfewer \nrequirements", "About the \nsame number of \nrequirements", "Somewhat \nmore \nrequirements", "Many \nmore \nrequirements", "Not applicable", "Refused", "Don’t know")
+p <- q65d %>%
+  group_by(Q65D) %>%
+  summarise(number = sum(withinwt_hh)) %>%
+  ggplot(aes(x = as.factor(Q65D), y = number))+
+      geom_col(fill="blue", color="black") +
+      scale_x_discrete(labels = (cname))+
+      scale_y_continuous(expand = c(0,10))+
+      labs(title = "China puts more or less conditions on assistance",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+### Q70e. Influence of country: China
+Do you think that the economic and political influence of each of the following countries on Nigeria is mostly positive, mostly negative, or haven’t you heard enough to say? China
+```{r}
+q70e <- subset(nigeria, select=c("RESPNO","Q70E", "withinwt_hh"))
+#recode the answer
+q70e$Q70E[as.numeric(q70e$Q70E) == "-1"] <- NA
+
+q70e <- na.omit(q70e)
+```
+
+
+```{r Plot 14, message=FALSE, warning=FALSE}
+cname <- c("Very \nnegative", "Somewhat \nnegative", "Neither positive \nnor negative", "Somewhat \npositive", "Very \npositive", "Refused", "Don’t know")
+p <- q70e %>%
+  group_by(Q70E) %>%
+  summarise(number = sum(withinwt_hh)) %>%
+  ggplot(aes(x = as.factor(Q70E), y = number))+
+      geom_col(fill="blue", color="black") +
+      scale_x_discrete(labels = (cname))+
+      scale_y_continuous(expand = c(0,5))+
+      labs(title = "Influence of country: China",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+### Q81. Ethnic community, cultural group or tribe
+Let’s go back to talking about you. What is your ethnic community, cultural group or tribe?
+```{r}
+q81 <- subset(nigeria, select=c("RESPNO","Q81", "withinwt_hh"))
+#recode the answer
+q81$Q81[as.numeric(q81$Q81) == "-1"] <- NA
+
+q81 <- na.omit(q81)
+```
+
+
+```{r Plot 15, message=FALSE, warning=FALSE}
+cname <- c("Hausa", "Igbo", "Yoruba", "Efik", "Ebira", "Fulani", "Isoko", "Ibibio", "Kanuri", "Tiv", "Nupe", "Ijaw", "Edo", "Igala", "Urhobo", "Idoma", "Ikwere", "Kalabari", "Birom", "Jukun", "Gwari", "Karekare" , "Agatu", "Buju", "Yagba", "Nigerian only", "Others", "Refused to answer", "Don't know")
+p <- q81 %>%
+  group_by(Q81) %>%
+  summarise(number = sum(withinwt_hh)) %>%
+  ggplot(aes(x = as.factor(Q81), y = number))+
+      geom_col(fill="blue", color="black") +
+      scale_x_discrete(labels = (cname))+
+      scale_y_continuous(expand = c(0,5))+
+      labs(title = "Ethnic community, cultural group or tribe",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.text.x = element_text(angle = 45, hjust=1),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+### Q82a. Ethnic group treated unfairly by government
+How often, if ever, are ___________s [R’s Ethnic Group] treated unfairly by the government?
+```{r}
+q82a <- subset(nigeria, select=c("RESPNO","Q82A", "withinwt_hh"))
+#recode the answer
+q82a$Q82A[as.numeric(q82a$Q82A) == "-1"] <- NA
+
+q82a <- na.omit(q82a)
+```
+
+
+```{r Plot 16, message=FALSE, warning=FALSE}
+cname <- c("Never", "Sometimes", "Often", "Always", "Not applicable", "Refused", "Don't know")
+p <- q82a %>%
+  group_by(Q82A) %>%
+  summarise(number = sum(withinwt_hh)) %>%
+  ggplot(aes(x = as.factor(Q82A), y = number))+
+      geom_col(fill="blue", color="black") +
+      scale_x_discrete(labels = (cname))+
+      scale_y_continuous(expand = c(0,5))+
+      labs(title = "Ethnic group treated unfairly by government",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+### Q82b. Ethnic or national identity
+Let us suppose that you had to choose between being a Nigerian and being a ________ [R’s Ethnic Group]. Which of the following statements best expresses your feelings?
+```{r}
+q82b <- subset(nigeria, select=c("RESPNO","Q82B", "withinwt_hh"))
+#recode the answer
+q82b$Q82B[as.numeric(q82b$Q82B) == "-1"] <- NA
+
+q82b <- na.omit(q82b)
+```
+
+
+```{r Plot 17, message=FALSE, warning=FALSE}
+cname <- c("I feel \nonly R", "I feel \nmore R \nthan Nigerian"," I feel equally \nNigerian \nand R", "I feel \nmore Nigerian \nthan R", "I feel \nonly Nigerian","Not applicable", "Refused", "Don't know")
+p <- q82b %>%
+  group_by(Q82B) %>%
+  summarise(number = sum(withinwt_hh)) %>%
+  ggplot(aes(x = as.factor(Q82B), y = number))+
+      geom_col(fill="blue", color="black") +
+      scale_x_discrete(labels = (cname))+
+      scale_y_continuous(expand = c(0,5))+
+      labs(title = "Ethnic or national identity",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+### Q84c. Unfair treatment by other people based on ethnicity
+In the past year, how often, if ever, have you personally been treated unfairly by other Nigerians based on: your ethnicity?
+```{r}
+q84c <- subset(nigeria, select=c("RESPNO","Q84C", "withinwt_hh"))
+#recode the answer
+q84c$Q84C[as.numeric(q84c$Q84C) == "-1"] <- NA
+
+q84c <- na.omit(q84c)
+```
+
+
+```{r Plot 18, message=FALSE, warning=FALSE}
+cname <- c("Never", "Once or twice", "Several times", "Many times", "Refused", "Don't know")
+p <- q84c %>%
+  group_by(Q84C) %>%
+  summarise(number = sum(withinwt_hh)) %>%
+  ggplot(aes(x = as.factor(Q84C), y = number))+
+      geom_col(fill="blue", color="black") +
+      scale_x_discrete(labels = (cname))+
+      scale_y_continuous(expand = c(0,10))+
+      labs(title = "Unfair treatment by other people based on ethnicity",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+## Additional Questions {.tabset}
+
+### Q66. Open trade for development vs protect local producers
+Which of the following statements is closest to your view? Choose Statement 1 or Statement 2. Statement 1: In order to develop, our country must rely on trade with the rest of the world, including by opening our borders to foreign imports.
+Statement 2: In order to develop, our country must rely on local production and protect local producers from foreign competition.
+```{r}
+q66 <- subset(nigeria, select=c("RESPNO","Q66", "withinwt_hh"))
+#recode the answer
+q66$Q66[as.numeric(q66$Q66) == "-1"] <- NA
+
+q66 <- na.omit(q66)
+```
+
+
+```{r Plot 19, message=FALSE, warning=FALSE}
+cname <- c("Agree very \nstrongly with \nStatement 1", "Agree with \nStatement 1", "Agree with \nStatement 2", "Agree very \nstrongly with \nStatement 2", "Agree with neither", "Refused", "Don’t know")
+p <- q66 %>%
+  group_by(Q66) %>%
+  summarise(number = sum(withinwt_hh)) %>%
+  ggplot(aes(x = as.factor(Q66), y = number))+
+      geom_col(fill="blue", color="black") +
+      scale_x_discrete(labels = (cname))+
+      scale_y_continuous(expand = c(0,5))+
+      labs(title = "Open trade for development vs protect local producers",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+### Q67. Only nationals trade vs allow foreigners to trade
+Which of the following statements is closest to your view? Choose Statement 1 or Statement 2. Statement 1: The government should only allow citizens and companies of our own country to trade in consumer goods, even if this means we will have fewer goods or higher prices.
+Statement 2: The government should continue to permit foreigners and foreign corporations to set up retail shops in this country to ensure we have a wide choice of low-cost consumer goods.
+```{r}
+q67 <- subset(nigeria, select=c("RESPNO","Q67", "withinwt_hh"))
+#recode the answer
+q67$Q67[as.numeric(q67$Q67) == "-1"] <- NA
+
+q67 <- na.omit(q67)
+```
+
+
+```{r Plot 20, message=FALSE, warning=FALSE}
+cname <- c("Agree very \nstrongly with \nStatement 1", "Agree with \nStatement 1", "Agree with \nStatement 2", "Agree very \nstrongly with \nStatement 2", "Agree with neither", "Refused", "Don’t know")
+p <- q67 %>%
+  group_by(Q67) %>%
+  summarise(number = sum(withinwt_hh)) %>%
+  ggplot(aes(x = as.factor(Q67), y = number))+
+      geom_col(fill="blue", color="black") +
+      scale_x_discrete(labels = (cname))+
+      scale_y_continuous(expand = c(0,5))+
+      labs(title = "Only nationals trade vs allow foreigners to trade",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+### Q68. Diverse communities stronger vs similar communities stronger
+Which of the following statements is closest to your view? Choose Statement 1 or Statement 2. Statement 1: Communities are stronger when they are made up of people from different ethnic groups, races, or religions.
+Statement 2: Communities are stronger when they are made up of people who are similar to each other, that is, people from the same ethnic group, race, or religion.
+```{r}
+q68 <- subset(nigeria, select=c("RESPNO","Q68", "withinwt_hh"))
+#recode the answer
+q68$Q68[as.numeric(q68$Q68) == "-1"] <- NA
+
+q68 <- na.omit(q68)
+```
+
+
+```{r Plot 21, message=FALSE, warning=FALSE}
+cname <- c("Agree very \nstrongly with \nStatement 1", "Agree with \nStatement 1", "Agree with \nStatement 2", "Agree very \nstrongly with \nStatement 2", "Agree with neither", "Refused", "Don’t know")
+p <- q68 %>%
+  group_by(Q68) %>%
+  summarise(number = sum(withinwt_hh)) %>%
+  ggplot(aes(x = as.factor(Q68), y = number))+
+      geom_col(fill="blue", color="black") +
+      scale_x_discrete(labels = (cname))+
+      scale_y_continuous(expand = c(0,5))+
+      labs(title = "Diverse communities stronger vs similar communities stronger",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+### Q69a.Best country model for development
+In your opinion, which of the following countries, if any, would be the best model for the future development of our country, or is there some other country in Africa or elsewhere, that should be our model?
+```{r}
+q69a <- subset(nigeria, select=c("RESPNO","Q69A", "withinwt_hh"))
+#recode the answer
+q69a$Q69A[as.numeric(q69a$Q69A) == "-1"] <- NA
+
+q69a <- na.omit(q69a)
+```
+
+
+```{r Plot 22, message=FALSE, warning=FALSE}
+cname <- c("None \nof these", "United \nStates", "China", "Former \ncolonial \npower (Britain)", "South \nAfrica", "Ethiopia", "We should \nfollow our own \ncountry’s model","KSA", "Other", "Refused", "Don’t know")
+p <- q69a %>%
+  group_by(Q69A) %>%
+  summarise(number = sum(withinwt_hh)) %>%
+  ggplot(aes(x = as.factor(Q69A), y = number))+
+      geom_col(fill="blue", color="black") +
+      scale_x_discrete(labels = (cname))+
+      scale_y_continuous(expand = c(0,5))+
+      labs(title = "Best country model for development",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+### Q69b. Influence of China on country
+How much influence do you think China’s economic activities in Nigeria have on our economy, or haven’t you heard enough to say?
+```{r}
+q69b <- subset(nigeria, select=c("RESPNO","Q69B", "withinwt_hh"))
+#recode the answer
+q69b$Q69B[as.numeric(q69b$Q69B) == "-1"] <- NA
+
+q69b <- na.omit(q69b)
+```
+
+
+```{r Plot 23, message=FALSE, warning=FALSE}
+cname <- c("None", "A little", "Some", "A lot", "Refused", "Don’t know")
+p <- q69b %>%
+  group_by(Q69B) %>%
+  summarise(number = sum(withinwt_hh)) %>%
+  ggplot(aes(x = as.factor(Q69B), y = number))+
+      geom_col(fill="blue", color="black") +
+      scale_x_discrete(labels = (cname))+
+      scale_y_continuous(expand = c(0,5))+
+      labs(title = "Influence of China on country",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+### Q71. Most important international language
+In thinking about the future of the next generation in our country, which of these international languages, if any, do you think is most important for young people to learn?
+```{r}
+q71 <- subset(nigeria, select=c("RESPNO","Q71", "withinwt_hh"))
+#recode the answer
+q71$Q71[as.numeric(q71$Q71) == "-1"] <- NA
+
+q71 <- na.omit(q71)
+```
+
+
+```{r Plot 24, message=FALSE, warning=FALSE}
+cname <- c("None needed", "English", "French", "Portuguese", "Arabic", "Chinese", "Kiswahili",  "Other","Refused", "Don’t know")
+p <- q71 %>%
+  group_by(Q71) %>%
+  summarise(number = sum(withinwt_hh)) %>%
+  ggplot(aes(x = as.factor(Q71), y = number))+
+      geom_col(fill="blue", color="black") +
+      scale_x_discrete(labels = (cname))+
+      scale_y_continuous(expand = c(0,5))+
+      labs(title = "Most important international language",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+### Q85. More that unites or more that divides people
+Nigerians are very diverse. They come from different religions, ethnic groups, political parties, and economic and social backgrounds. Overall, would you say that there is more that unites all Nigerians as one people, or more that divides them?
+```{r}
+q85 <- subset(nigeria, select=c("RESPNO","Q85", "withinwt_hh"))
+#recode the answer
+q85$Q85[as.numeric(q85$Q85) == "-1"] <- NA
+
+q85 <- na.omit(q85)
+```
+
+
+```{r Plot 25, message=FALSE, warning=FALSE}
+cname <- c("Much more \nthat divides us", "Somewhat more \nthat divides us", "Somewhat more \nthat unites us", "Much more \nthat \nunites us","Refused", "Don’t know")
+p <- q85 %>%
+  group_by(Q85) %>%
+  summarise(number = sum(withinwt_hh)) %>%
+  ggplot(aes(x = as.factor(Q85), y = number))+
+      geom_col(fill="blue", color="black") +
+      scale_x_discrete(labels = (cname))+
+      scale_y_continuous(expand = c(0,5))+
+      labs(title = "More that unites or more that divides people",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+### Q95b. Required to pay an income tax
+If you have paid employment, that is, regular employment for which you receive something like an hourly wage or a regular salary, are you required to pay an income tax, that is, a tax deducted from your wages by your employer?
+```{r}
+q95b <- subset(nigeria, select=c("RESPNO","Q95B", "withinwt_hh"))
+#recode the answer
+q95b$Q95B[as.numeric(q95b$Q95B) == "-1"] <- NA
+
+q95b <- na.omit(q95b)
+```
+
+
+```{r Plot 26, message=FALSE, warning=FALSE}
+cname <- c("No", "Yes", "Not applicable","Refused", "Don’t know")
+p <- q95b %>%
+  group_by(Q95B) %>%
+  summarise(number = sum(withinwt_hh)) %>%
+  ggplot(aes(x = as.factor(Q95B), y = number))+
+      geom_col(fill="blue", color="black") +
+      scale_x_discrete(labels = (cname))+
+      scale_y_continuous(expand = c(0,5))+
+      labs(title = "Required to pay an income tax",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+## Media Questions   {.tabset}
+### Q55 A-E
+Now let us talk about the media and how you get information about politics and other issues. How often do you get news from the following sources?
+```{r}
+q55 <- subset(nigeria, select=c("RESPNO","Q55A","Q55B","Q55C","Q55D","Q55E", "withinwt_hh"))
+#recode the answer
+q55$Q55A[as.numeric(q55$Q55A) == "-1"] <- NA
+q55$Q55B[as.numeric(q55$Q55B) == "-1"] <- NA
+q55$Q55C[as.numeric(q55$Q55C) == "-1"] <- NA
+q55$Q55D[as.numeric(q55$Q55D) == "-1"] <- NA
+q55$Q55E[as.numeric(q55$Q55E) == "-1"] <- NA
+
+q55 <- na.omit(q55)
+```
+
+#### Q55a. Radio news
+```{r Plot 27.1, message=FALSE, warning=FALSE}
+cname <- c("Never", "Less than \nonce a month", "A few times \na month", "A few times \na week", "Every day", "Don’t know")
+p <- q55 %>%
+  group_by(Q55A) %>%
+  summarise(number = sum(withinwt_hh)) %>%
+  ggplot(aes(x = as.factor(Q55A), y = number))+
+      geom_col(fill="blue", color="black") +
+      scale_x_discrete(labels = (cname))+
+      scale_y_continuous(expand = c(0,5))+
+      labs(title = "Radio news",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+#### Q55b. Television news
+```{r Plot 27.2, message=FALSE, warning=FALSE}
+cname <- c("Never", "Less than \nonce a month", "A few times \na month", "A few times \na week", "Every day", "Don’t know")
+p <- q55 %>%
+  group_by(Q55B) %>%
+  summarise(number = sum(withinwt_hh)) %>%
+  ggplot(aes(x = as.factor(Q55B), y = number))+
+      geom_col(fill="blue", color="black") +
+      scale_x_discrete(labels = (cname))+
+      scale_y_continuous(expand = c(0,5))+
+      labs(title = "Television news",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+#### Q55c. Newspaper news
+```{r Plot 27.3, message=FALSE, warning=FALSE}
+cname <- c("Never", "Less than \nonce a month", "A few times \na month", "A few times \na week", "Every day", "Don’t know")
+p <- q55 %>%
+  group_by(Q55C) %>%
+  summarise(number = sum(withinwt_hh)) %>%
+  ggplot(aes(x = as.factor(Q55C), y = number))+
+      geom_col(fill="blue", color="black") +
+      scale_x_discrete(labels = (cname))+
+      scale_y_continuous(expand = c(0,10))+
+      labs(title = "Newspaper news",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+#### Q55d. Internet news
+```{r Plot 27.4, message=FALSE, warning=FALSE}
+cname <- c("Never", "Less than \nonce a month", "A few times \na month", "A few times \na week", "Every day", "Don’t know")
+p <- q55 %>%
+  group_by(Q55D) %>%
+  summarise(number = sum(withinwt_hh)) %>%
+  ggplot(aes(x = as.factor(Q55D), y = number))+
+      geom_col(fill="blue", color="black") +
+      scale_x_discrete(labels = (cname))+
+      scale_y_continuous(expand = c(0,10))+
+      labs(title = "Internet news",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+#### Q55e. Social media news
+```{r Plot 27.5, message=FALSE, warning=FALSE}
+cname <- c("Never", "Less than \nonce a month", "A few times \na month", "A few times \na week", "Every day", "Refused","Don’t know")
+p <- q55 %>%
+  group_by(Q55E) %>%
+  summarise(number = sum(withinwt_hh)) %>%
+  ggplot(aes(x = as.factor(Q55E), y = number))+
+      geom_col(fill="blue", color="black") +
+      scale_x_discrete(labels = (cname))+
+      scale_y_continuous(expand = c(0,10))+
+      labs(title = "Social media news",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+### Q92 A-H
+Which of these things do you personally own? [If no, ask:] Does anyone else in your household own one?
+```{r}
+q92 <- subset(nigeria, select=c("RESPNO","Q92A","Q92B","Q92C","Q92D","Q92E", 
+                                "Q92F", "Q92G", "Q92H","withinwt_hh"))
+#recode the answer
+q92$Q92A[as.numeric(q92$Q92A) == "-1"] <- NA
+q92$Q92B[as.numeric(q92$Q92B) == "-1"] <- NA
+q92$Q92C[as.numeric(q92$Q92C) == "-1"] <- NA
+q92$Q92D[as.numeric(q92$Q92D) == "-1"] <- NA
+q92$Q92E[as.numeric(q92$Q92E) == "-1"] <- NA
+q92$Q92F[as.numeric(q92$Q92F) == "-1"] <- NA
+q92$Q92G[as.numeric(q92$Q92G) == "-1"] <- NA
+q92$Q92H[as.numeric(q92$Q92H) == "-1"] <- NA
+
+q92 <- na.omit(q92)
+```
+
+#### Q92a. Own radio
+```{r Plot 28.1, message=FALSE, warning=FALSE}
+cname <- c("No one in \nhousehold owns", "Someone else in \nhousehold owns", "Personally owns", "Refused", "Don’t know")
+p <- q92 %>%
+  group_by(Q92A) %>%
+  summarise(number = sum(withinwt_hh)) %>%
+  ggplot(aes(x = as.factor(Q92A), y = number))+
+      geom_col(fill="blue", color="black") +
+      scale_x_discrete(labels = (cname))+
+      scale_y_continuous(expand = c(0,5))+
+      labs(title = "Own radio",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+#### Q92b. Own television
+```{r Plot 28.2, message=FALSE, warning=FALSE}
+cname <- c("No one in \nhousehold owns", "Someone else in \nhousehold owns", "Personally owns", "Refused", "Don’t know")
+p <- q92 %>%
+  group_by(Q92B) %>%
+  summarise(number = sum(withinwt_hh)) %>%
+  ggplot(aes(x = as.factor(Q92B), y = number))+
+      geom_col(fill="blue", color="black") +
+      scale_x_discrete(labels = (cname))+
+      scale_y_continuous(expand = c(0,5))+
+      labs(title = "Own television",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+#### Q92c. Own motor vehicle, car, or motorcycle
+```{r Plot 28.3, message=FALSE, warning=FALSE}
+cname <- c("No one in \nhousehold owns", "Someone else in \nhousehold owns", "Personally owns", "Refused", "Don’t know")
+p <- q92 %>%
+  group_by(Q92C) %>%
+  summarise(number = sum(withinwt_hh)) %>%
+  ggplot(aes(x = as.factor(Q92C), y = number))+
+      geom_col(fill="blue", color="black") +
+      scale_x_discrete(labels = (cname))+
+      scale_y_continuous(expand = c(0,5))+
+      labs(title = "Own motor vehicle, car, or motorcycle",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+#### Q92d. Own computer
+```{r Plot 28.4, message=FALSE, warning=FALSE}
+cname <- c("No one in \nhousehold owns", "Someone else in \nhousehold owns", "Personally owns", "Refused", "Don’t know")
+p <- q92 %>%
+  group_by(Q92D) %>%
+  summarise(number = sum(withinwt_hh)) %>%
+  ggplot(aes(x = as.factor(Q92D), y = number))+
+      geom_col(fill="blue", color="black") +
+      scale_x_discrete(labels = (cname))+
+      scale_y_continuous(expand = c(0,5))+
+      labs(title = "Own computer",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+
+#### Q92e. Own bank account
+```{r Plot 28.5, message=FALSE, warning=FALSE}
+cname <- c("No one in \nhousehold owns", "Someone else in \nhousehold owns", "Personally owns", "Refused", "Don’t know")
+p <- q92 %>%
+  group_by(Q92E) %>%
+  summarise(number = sum(withinwt_hh)) %>%
+  ggplot(aes(x = as.factor(Q92E), y = number))+
+      geom_col(fill="blue", color="black") +
+      scale_x_discrete(labels = (cname))+
+      scale_y_continuous(expand = c(0,5))+
+      labs(title = "Own bank account",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+#### Q92f. Own mobile phone
+```{r Plot 28.6, message=FALSE, warning=FALSE}
+cname <- c("No one in \nhousehold owns", "Someone else in \nhousehold owns", "Personally owns", "Refused", "Don’t know")
+p <- q92 %>%
+  group_by(Q92F) %>%
+  summarise(number = sum(withinwt_hh)) %>%
+  ggplot(aes(x = as.factor(Q92F), y = number))+
+      geom_col(fill="blue", color="black") +
+      scale_x_discrete(labels = (cname))+
+      scale_y_continuous(expand = c(0,5))+
+      labs(title = "Own mobile phone",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+#### Q92g. Mobile phone access to internet
+```{r Plot 28.7, message=FALSE, warning=FALSE}
+cname <- c("No", "Yes", "Not applicable", "Refused", "Don’t know")
+p <- q92 %>%
+  group_by(Q92G) %>%
+  summarise(number = sum(withinwt_hh)) %>%
+  ggplot(aes(x = as.factor(Q92G), y = number))+
+      geom_col(fill="blue", color="black") +
+      scale_x_discrete(labels = (cname))+
+      scale_y_continuous(expand = c(0,5))+
+      labs(title = "Mobile phone access to internet",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+#### Q92h. How often use a mobile phone
+```{r Plot 28.8, message=FALSE, warning=FALSE}
+cname <- c("Never", "Less than \nonce a month", "A few times \na month", "A few times \na week", "Every day", "Don’t know")
+p <- q92 %>%
+  group_by(Q92H) %>%
+  summarise(number = sum(withinwt_hh)) %>%
+  ggplot(aes(x = as.factor(Q92H), y = number))+
+      geom_col(fill="blue", color="black") +
+      scale_x_discrete(labels = (cname))+
+      scale_y_continuous(expand = c(0,10))+
+      labs(title = " How often use a mobile phone",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
