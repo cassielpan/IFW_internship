@@ -1,0 +1,1130 @@
+---
+title: "map"
+author: "Zixin"
+date: "5/30/2022"
+output:
+  html_document:
+    keep_md: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+if(!require("leaflet")) {install.packages("leaflet"); library("leaflet")}
+if(!require("dplyr")) {install.packages("dplyr"); library("dplyr")}
+if(!require("rgeos")) {install.packages("rgeos"); library("rgeos")}
+if(!require("rgdal")) {install.packages("rgdal"); library("rgdal")}
+if(!require("ggplot2")) {install.packages("ggplot2"); library("ggplot2")}
+if(!require("broom")) {install.packages("broom"); library("broom")}
+if(!require("tidyr")) {install.packages("tidyr"); library("tidyr")}
+if(!require("scales")) {install.packages("scales"); library("scales")}
+if(!require("lubridate")) {install.packages("lubridate"); library("lubridate")}
+if(!require("showtext")) {install.packages("showtext"); library("showtext")} # show Chinese
+if(!require("stargazer")) {install.packages("stargazer"); library("stargazer")}
+if(!require("sandwich")) {install.packages("sandwich"); library("sandwich")}
+if(!require("countrycode")) {install.packages("countrycode"); library("countrycode")}
+if(!require("readxl")) {install.packages("readxl"); library("readxl")}
+if(!require("reshape2")) {install.packages("reshape2"); library("reshape2")}
+if(!require("haven")) {install.packages("haven"); library("haven")}
+if(!require("sjPlot")) {install.packages("sjPlot"); library("sjPlot")}
+if(!require("htmlwidgets")) {install.packages("htmlwidgets"); library("htmlwidgets")}
+
+```
+
+## Map {.tabset}
+### shape files
+```{r message=FALSE, warning=FALSE}
+posts <- read.csv("Afrobarometer surveyed countries.csv")
+my_spdf <- readOGR( 
+  dsn= paste0(getwd(),"/DATA/") , 
+  layer="TM_WORLD_BORDERS_SIMPL-0.3",
+  verbose=FALSE
+)
+
+```
+
+```{r include=FALSE}
+africa <- my_spdf[my_spdf@data$REGION==2 , ]
+# Plot africa
+par(mar=c(0,0,0,0))
+plot(africa , xlim=c(-20,60) , ylim=c(-40,35), col="skyblue", lwd=0.5 )
+```
+
+```{r include=FALSE}
+# select big countries only
+africaBig <- africa[which(africa@data$AREA>75000), ]
+
+# Small manipulation to put it in a dataframe:
+centers <- cbind.data.frame(data.frame(gCentroid(africaBig, byid=TRUE), id=africaBig@data$FIPS))
+
+# Show it on the map?
+par(mar=c(0,0,0,0))
+plot(africa , xlim=c(-20,60) , ylim=c(-40,35), lwd=0.5 )
+text(centers$x, centers$y, centers$id, cex=.9, col="#69b3a2")
+```
+
+```{r warning=FALSE}
+africa.map <- tidy(africa, region = "ISO3")
+region_code <- africa@data[,c("ISO3","NAME")]
+names(region_code)[names(region_code) =="ISO3" ] <- "id"
+africa.map <- left_join(africa.map, region_code, by = "id")
+
+# add IOS3 from package countrycode
+africa.map$Country <- countrycode(sourcevar =africa.map$id ,
+origin = "iso3c", destination = "country.name")
+posts$id <- countrycode(sourcevar =posts$country ,
+origin = "country.name", destination = "iso3c")
+
+# rename lat and long for consistency with shp file
+names(posts)[which(names(posts) == 'longitude')] <- 'long'
+names(posts)[which(names(posts) == 'latitude')] <- 'lat'
+# countries
+cnames <- aggregate(cbind(long, lat) ~ id, data=africa.map, FUN=mean)
+
+post_pop <- posts %>%
+  subset(select = c("id","population_size"))
+countries <- left_join(africa.map, post_pop, by = "id")
+
+```
+
+```{r Plot 0, results='asis', message=FALSE, warning=FALSE}
+p0 <- ggplot(countries, aes(x = long, y = lat, fill= as.numeric(population_size), 
+                            group = group)) +
+  scale_fill_gradient(guide = guide_legend(),
+                      name ="Population Size", labels=comma,
+                      low = "yellow", high = "red",
+                      breaks=seq(0,200000000,20000000))+
+  geom_polygon(colour = "gray", size = 0.5, aes(group = group)) +
+  geom_text(data = cnames, aes(x = long, y = lat, label = id), size = 2, 
+            inherit.aes = FALSE, colour="darkred") +
+  geom_point(data = posts, aes(x = long, y = lat, size = post_obtained, group = NULL), 
+             colour = "brown3", alpha=0.5)+
+  scale_size(range = c(.1, 18), name="Obtained Posts")+
+  theme_void() +
+  theme(legend.margin =margin(r=10,l=5,t=5,b=5),
+        legend.position="right")
+p0
+```
+
+### leaflet package
+```{r message=FALSE, warning=FALSE}
+x <- leaflet() %>% 
+   addTiles() %>% 
+   setView( lng = 22.00, lat = 2.30, zoom = 3 ) %>% 
+   addProviderTiles("Esri.WorldTopoMap")
+```
+
+```{r}
+# Create a color palette with handmade bins.
+mybins <- seq(0, 2500, by=250)
+mypalette <- colorBin( topo.colors(10), domain=posts$post_obtained, na.color="transparent", bins=mybins)
+# Prepare the text for the tooltip:
+mytext <- paste(
+   "Country: ", posts$country, "<br/>", 
+   "Population Size:", posts$population_size, "<br/>",
+   "Obtained Posts: ", posts$post_obtained, "<br/>", 
+   "Total Posts: ", posts$total_post, sep="") %>%
+  lapply(htmltools::HTML)
+
+
+```
+
+```{r}
+# Final Map
+x <- leaflet(posts) %>% 
+   addTiles() %>% 
+   setView( lng = 22.00, lat = 2.30, zoom = 3 ) %>% 
+   addProviderTiles("Esri.WorldTopoMap")%>%
+   addCircleMarkers(~long, ~lat, 
+   fillColor = ~mypalette(post_obtained), fillOpacity = 0.7, color="white", radius=8, stroke=FALSE,
+   label = mytext,
+   labelOptions = labelOptions( style = list("font-weight" = "normal", padding = "3px 8px"), textsize = "13px", direction = "auto")
+  ) %>%
+   addLegend( pal=mypalette, values=~post_obtained, opacity=0.9, title = "Obtained Posts", position = "bottomright" )
+x
+
+### bubble size differs
+m <- leaflet(posts) %>% 
+   addTiles() %>%
+   setView( lng = 22.00, lat = 2.30, zoom = 3 ) %>% 
+   addProviderTiles("Esri.WorldTopoMap")%>%
+   addCircleMarkers(~long, ~lat, radius = ~ post_obtained/50, stroke = FALSE, fillOpacity = 0.5,
+   label = mytext,
+   labelOptions = labelOptions( style = list("font-weight" = "normal", padding = "3px 8px"), textsize = "13px", direction = "auto")) 
+m
+```
+
+
+```{r}
+# save the widget in a html file if needed.
+saveWidget(x, file=paste0( getwd(), "/backgroundMapTile.html"))
+saveWidget(m, file=paste0( getwd(), "/size.html"))
+```
+
+
+## Normal Descriptions {.tabset}
+```{r message=FALSE, warning=FALSE}
+data_2007 <- read.csv("Overseas Chinese in Africa in 2007.csv")
+data_2007$id <- countrycode(sourcevar =data_2007$country ,
+origin = "country.name", destination = "iso3c")
+data_2007 <- subset(data_2007, select = c("population", "id"))
+dataset <- left_join(posts, data_2007, by = "id")
+cities <- read.csv("cities.csv") %>% 
+  select(c(Cities, population_size, data_available))
+```
+
+### Population size and available data {.tabset}
+```{r Plot 1, results='asis', message=FALSE, warning=FALSE}
+p1 <- ggplot(cities, aes(x=log(population_size), y=data_available)) + 
+  geom_point(shape=18, size= 3, color="blue")+
+  geom_smooth(method="glm",method.args = list(family = "binomial"),
+              color="red", fill="lightblue") +
+  theme_light() +
+  theme(axis.title.y = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(colour = "gray"))
+p1
+```
+
+```{r}
+reg0 <- glm(data_available ~ log(population_size), data= cities, family = "binomial")
+cov_0 <- vcovHC(reg0)
+se_0 <- sqrt(diag(cov_0))
+
+reg0a <- lm(data_available ~ log(population_size), data= cities,)
+cov_0a <- vcovHC(reg0a)
+se_0a <- sqrt(diag(cov_0a))
+```
+
+```{r  Table 1, results ='asis', message=FALSE, warning=FALSE}
+stargazer(reg0,reg0a, type="html",
+          dep.var.labels = c("Available Data (dummy)"),
+          covariate.labels= c("Population Size(log)", "Constant"),
+          se=list(se_0,se_0a), column.separate = c(1,1),
+          notes.align = "l",
+          notes = "Robust standard errors are in parentheses.")
+```
+
+
+### Share of posts obtained by total posts
+```{r Plot 2, results='asis', message=FALSE, warning=FALSE}
+colors = c("Obtained Posts" = "red", "Total Posts" = "blue")
+p2 <- ggplot() +
+   geom_point(data = dataset, aes(x = country, y=post_obtained,
+                                color ="Obtained Posts"), 
+                                shape=17, size=2.5) +
+   geom_point(data = dataset, aes(x = country, y=total_post,
+                                color = "Total Posts"), shape=19, size=2) +
+   scale_y_continuous(limits = c(0,max(dataset$total_post)), expand = c(0,400)) +
+   scale_color_manual(values = colors, name = "") +
+   ylab("The Number of Posts")+
+   theme_light() +
+   theme(text = element_text(size=10),
+         axis.text.x = element_text(angle = 45, hjust=1),
+         axis.title.y = element_blank(),legend.position = "bottom",
+         panel.grid.major = element_blank(),
+         panel.grid.minor = element_blank(),
+         axis.line = element_line(colour = "gray")) 
+p2
+```
+
+### Posts by number of Chinese in 2007
+```{r Plot 3, results='asis', message=FALSE, warning=FALSE}
+colors = c("Obtained Posts" = "red", "Chinese in 2007" = "blue")
+p3 <- ggplot() +
+   geom_point(data = dataset, aes(x = country, y=population/20,
+                                color = "Chinese in 2007"), shape=19, size=2) +
+   geom_point(data = dataset, aes(x = country, y=post_obtained,
+                                color ="Obtained Posts"), shape=17,size=1.5) +
+   scale_y_continuous(name = "The Number\nof\nObtained Posts",
+                      limits = c(0,max(dataset$population/20)),expand = c(0,150),
+                      sec.axis = sec_axis( trans=~.*20, 
+                                           name="The Number\nof\nChinese in 2007")) +
+   scale_color_manual(values = colors, name = "") +
+   theme_light() +
+   theme(text = element_text(size=7),
+         axis.text.x = element_text(angle = 45, hjust=1),
+         axis.title.x = element_blank(),
+         axis.title.y.left = element_text(angle=0),
+         axis.title.y.right = element_text(angle = 0, hjust = 0.5, vjust = 1),
+         legend.position = "bottom",
+         panel.grid.major = element_blank(),
+         panel.grid.minor = element_blank(),
+         axis.line = element_line(colour = "gray")) 
+p3
+```
+
+## descritions of user file
+```{r}
+users <- read.csv("users.csv")
+sample <- users %>%
+  mutate(verification = ifelse(是否认证 == "False", 0, 1))
+
+verification <- sample %>%
+  group_by(verification) %>%
+  count() %>%
+  ungroup() %>% 
+  mutate(perc = `n` / sum(`n`)) %>% 
+  arrange(perc) %>%
+  mutate(labels = scales::percent(perc))
+```
+
+```{r Plot 4, results='asis', message=FALSE, warning=FALSE}
+p4 <- ggplot(verification, aes(x = "", y = perc, fill= factor(verification))) +
+  geom_col() +
+  ggtitle("The distribution of authenticated users in Algeria")+
+  geom_text(aes(label = labels),
+            position = position_stack(vjust = 0.5)) +
+  coord_polar(theta = "y")+
+  theme_void()+
+  scale_fill_manual(values=c("cadetblue3", "azure2"),
+                    name ="", 
+                     labels = c("non-authenticated", "authenticated"))
+p4
+```
+
+## time series frequency
+```{r message=FALSE, warning=FALSE}
+time_location <- read.csv("location.csv")
+sample_date <- time_location %>%
+                mutate(date = as.Date(日期, format="%Y-%m-%d"))
+sample_month <- sample_date %>%
+                  mutate(month = month(date),
+                         year = year(date))
+sample_by_month <- sample_month %>%
+                  group_by(month, year) %>%
+                  mutate(post_obs = length(bid))
+```
+
+```{r Plot 5, results='asis', message=FALSE, warning=FALSE}
+p5 <- sample_by_month %>%
+  mutate(month2 = as.Date(paste0("2015-", month,"-01"),"%Y-%m-%d")) %>%
+  ggplot(aes(x = month2, y = post_obs)) +
+      geom_point(color="blue") +
+      scale_y_continuous(expand = c(0,0))+
+      facet_wrap(~ year, ncol = 5) +
+      labs(title = "Total Monthly Posts in Algeria",
+           subtitle = "Data plotted by year",
+           y = "Monthly number of posts",
+           x = "") + 
+      scale_x_date(date_labels = "%b")+
+      theme_bw(base_size = 15) +
+      theme(strip.background = element_rect(fill = "skyblue"),
+            panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p5
+```
+
+## Descriptives for a couple of users {.tabset}
+```{r message=FALSE, warning=FALSE}
+#user1 <- read.csv("yilidos/3908778528.csv", row.names = NULL)
+#names(user1)[1:(ncol(user1)-1)] = names(user1)[2:(ncol(user1))]
+#colnames(user1)[ncol(user1)] <- "time"
+user1 <- read.csv("user_individual/yilidos/user1.csv")
+user1 <- user1 %>%
+                mutate(date = as.Date(日期, format="%Y-%m-%d"))
+
+user2 <- read.csv("user_individual/Y-Whispers/user2.csv")
+user2 <- user2 %>%
+                mutate(date = as.Date(日期, format="%Y-%m-%d"))
+
+user3 <- read.csv("user_individual/wangyu_yves/user3.csv")
+user3 <- user3 %>%
+                mutate(date = as.Date(日期, format="%Y-%m-%d"))
+
+user4 <- read.csv("user_individual/Twinkle姣/user4.csv")
+user4 <- user4 %>%
+                mutate(date = as.Date(日期, format="%Y-%m-%d"))
+
+user5 <- read.csv("user_individual/Tina20080505/user5.csv")
+user5 <- user5 %>%
+                mutate(date = as.Date(日期, format="%Y-%m-%d"))
+```
+### yilidos
+```{r Plot 6, results='asis', message=FALSE, warning=FALSE}
+yLabs <- c("Without Location", "In China", "In Algeria")
+p6 <- ggplot(data = user1, aes(x = date, y = location_index)) +
+      geom_point(color="red") +
+      scale_y_continuous(breaks = c(0,0.5,1), labels=yLabs)+
+      xlab("yilidos")+
+      scale_x_date(labels = date_format("%m-%Y"), breaks = "3 month")+
+      theme_light()+
+      theme(axis.title.y = element_blank(),
+            panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p6
+```
+
+### Y-Whispers
+```{r Plot 7, results='asis', message=FALSE, warning=FALSE}
+p7 <- ggplot(data = user2, aes(x = date, y = location_index)) +
+      geom_point(color="red") +scale_y_continuous(breaks = c(0,0.5,1), labels=yLabs)+
+      xlab("Y-Whispers")+
+      scale_x_date(labels = date_format("%m-%Y"), breaks = "8 month")+
+      theme_light()+
+      theme(axis.title.y = element_blank(),
+            panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p7
+```
+
+### wangyu_yves
+```{r Plot 8, results='asis', message=FALSE, warning=FALSE}
+p8 <- ggplot(data = user3, aes(x = date, y = location_index)) +
+      geom_point(color="red") +scale_y_continuous(breaks = c(0,0.5,1), labels=yLabs)+
+      xlab("wangyu_yves")+
+      scale_x_date(labels = date_format("%m-%Y"), breaks = "5 month")+
+      theme_light()+
+      theme(axis.title.y = element_blank(),
+            panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p8
+```
+
+### Twinkle姣
+```{r Plot 9, results='asis', message=FALSE, warning=FALSE}
+showtext_auto()
+p9 <- ggplot(data = user4, aes(x = date, y = location_index)) +
+      geom_point(color="red") +
+      scale_y_continuous(breaks = c(0,0.5,1), labels=yLabs)+
+      xlab("Twinkle姣")+
+      scale_x_date(labels = date_format("%m-%Y"), breaks = "2 month")+
+      theme_light()+
+      theme(axis.title.y = element_blank(),
+            panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p9
+```
+
+### Tina20080505
+```{r Plot 10, results='asis', message=FALSE, warning=FALSE}
+p10 <- ggplot(data = user5, aes(x = date, y = location_index)) +
+      geom_point(color="red") +
+      scale_y_continuous(breaks = c(0,0.5,1), labels=yLabs)+
+      xlab("Tina20080505")+
+      scale_x_date(labels = date_format("%m-%Y"), breaks = "7 month")+
+      theme_light()+
+      theme(axis.title.y = element_blank(),
+            panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p10
+```
+
+## Scatter Plots and Linear Fits {.tabset}
+```{r}
+posts$ISO3 <- countrycode(sourcevar =posts$country ,
+origin = "country.name" , destination = "iso3c")
+```
+
+### Posts and Population size 
+```{r Plot 11, results='asis', message=FALSE, warning=FALSE}
+# geom_smooth is at 95% confidence level
+p11 <- ggplot(posts, aes(x=log(post_obtained), y=log(population_size), label=ISO3)) + 
+  geom_point(shape=18, size= 3, color="blue")+
+  geom_text(size=3, hjust=1.1, vjust=0)+
+  geom_smooth(method=lm, color="red", fill="lightblue") +
+  labs(y = "Population Size (log)",
+       x = "Obtained Posts (log)") + 
+  theme_light() +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(colour = "gray"))
+p11
+```
+
+```{r}
+reg1 <- lm(log(population_size) ~ log(post_obtained), data= posts)
+cov_1 <- vcovHC(reg1)
+se_1 <- sqrt(diag(cov_1))
+
+reg1a <- lm(log(population_size) ~ log(total_post), data= posts)
+cov_1a <- vcovHC(reg1a)
+se_1a <- sqrt(diag(cov_1a))
+```
+
+### Posts and GDP per capita
+```{r Plot 12.1, results='asis', message=FALSE, warning=FALSE}
+# geom_smooth is at 95% confidence level
+p12a <- ggplot(posts, aes(x=log(post_obtained),y=log(gdp_percapita),label = ISO3)) + 
+  geom_point(shape=18, size= 3, color="blue")+
+  geom_text(size=2.5, hjust=1.1, vjust=0)+
+  geom_smooth(method=lm,color="blue", fill="lightblue") +
+  labs(x= "Obstained Posts (log)", y = "GDP per Capita(log)")+
+  theme_light() +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(colour = "gray"))
+p12a
+```
+
+```{r Plot 12.2, results='asis', message=FALSE, warning=FALSE}
+# geom_smooth is at 95% confidence level
+p12b <- ggplot(posts, aes(x=log(post_obtained),y=log(gdp_percapita_ppp),label = ISO3)) + 
+  geom_point(shape=18, size= 3, color="blue")+
+  geom_text(size=2.5, hjust=1.1, vjust=0) +
+  geom_smooth(method=lm,color="blue", fill="lightblue") +
+  labs(x= "Obstained Posts (log)", y = "GDP per Capita PPP(log)")+
+  theme_light() +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(colour = "gray"))
+p12b
+```
+
+```{r results ='asis', message=FALSE, warning=FALSE}
+reg2 <- lm(log(gdp_percapita) ~ log(post_obtained), data= posts)
+cov_2 <- vcovHC(reg2)
+se_2 <- sqrt(diag(cov_2))
+
+reg2a <- lm(log(gdp_percapita) ~ log(total_post), data= posts)
+cov_2a <- vcovHC(reg2a)
+se_2a <- sqrt(diag(cov_2a))
+
+reg3 <- lm(log(gdp_percapita_ppp) ~ log(post_obtained), data= posts)
+cov_3 <- vcovHC(reg3)
+se_3 <- sqrt(diag(cov_3))
+
+reg3a <- lm(log(gdp_percapita_ppp) ~ log(total_post), data= posts)
+cov_3a <- vcovHC(reg3a)
+se_3a <- sqrt(diag(cov_3a))
+
+stargazer(reg2,reg2a, reg3,reg3a, type="html",
+          dep.var.labels = c("", "",""),
+          column.labels = c("GDP per capita(log)", "GDP per capita PPP(log)"),
+          covariate.labels= c("Obatined Posts(log)", "Total Posts(log)"),
+          se=list(se_2,se_2a, se_3,se_3a), column.separate = c(2,2))
+```
+
+### Chinese FDI {.tabset}
+```{r}
+fdi <- read.csv("FDIData_10Jan2022.csv")
+region <- read.csv("region.csv")
+fdi_time_series <- head(fdi, - 1) 
+# make dataframe to a big melted dataframe
+fdi_df <- melt(fdi_time_series,  id.vars = 'X', variable.name = 'countries')
+fdi_df$countries <- as.character(fdi_df$countries)
+#make all 0 to NA in fdi_df
+fdi_df[fdi_df == "0"] <- NA
+# merge region to dataframe
+fdi_df$countries[as.character(fdi_df$countries) == "CAR"] <- "Central African Republic"
+fdi_df$ISO3 <- countrycode(sourcevar =fdi_df$countries ,
+                            origin = "country.name" , destination = "iso3c")
+region$ISO3 <- countrycode(sourcevar =region$country ,
+                            origin = "country.name" , destination = "iso3c")
+fdi_df <- left_join(fdi_df, region, by = "ISO3")
+#rotate fdi dataframe
+fdi_sum <- as.data.frame(t(fdi))
+#use first row as column names
+colnames(fdi_sum) <- fdi_sum[1,]
+# delete first row
+fdi_sum <- fdi_sum[-1, ] 
+#add a new column of row names
+fdi_sum$countries <- rownames(fdi_sum) 
+fdi_sum[fdi_sum == "CAR"] <- "Central African Republic"
+fdi_sum$ISO3 <- countrycode(sourcevar =fdi_sum$countries ,
+                            origin = "country.name" , destination = "iso3c")
+fdi_post <- left_join(posts, fdi_sum, by = "ISO3")
+```
+
+#### time seires for all countries
+```{r fig13, fig.height=8, fig.width=10, message=FALSE, warning=FALSE}
+p13 <- ggplot(data = fdi_df, aes(X, value)) +
+  geom_point(aes(colour = region), size=1) +
+  facet_wrap(~ countries, ncol = 8) +
+  labs(title = "Chinese FDI Stock in African Countries",
+           subtitle = "Data plotted by country",
+           y = "US$: million",
+           x = "Year: 2003-2020") +
+  theme_light(base_size = 9) +
+  theme(strip.background = element_rect(fill = "darkslategray4"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.text.x = element_blank(),
+        axis.line = element_line(colour = "gray"),
+        legend.key.size = unit(8, 'mm'),
+        legend.position="right")
+p13
+```
+
+#### Posts and Chinese FDI
+```{r Plot 14, results='asis', message=FALSE, warning=FALSE}
+# geom_smooth is at 95% confidence level
+p14 <- ggplot(fdi_post, aes(x=log(post_obtained), y=log(as.numeric(`sum_18-20`)),
+                            label=ISO3)) + 
+  geom_point(shape=18, size= 3, color="blue")+
+  geom_text(size=3, hjust=1.1, vjust=0)+
+  geom_smooth(method=lm, color="red", fill="lightblue") +
+  labs(y = "Sum of Chinese FDI 2018-2020 (log)",
+       x = "Obtained Posts (log)") + 
+  theme_light() +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(colour = "gray"))
+p14
+```
+
+
+```{r results ='asis', message=FALSE, warning=FALSE}
+reg4 <- lm(log(as.numeric(`sum_18-20`)) ~ log(post_obtained), data= fdi_post)
+cov_4 <- vcovHC(reg4)
+se_4 <- sqrt(diag(cov_4))
+
+reg4a <- lm(log(as.numeric(`sum_18-20`)) ~ log(total_post), data= fdi_post)
+cov_4a <- vcovHC(reg4a)
+se_4a <- sqrt(diag(cov_4a))
+```
+
+### Labor data {.tabset}
+```{r}
+labor <- read.csv("LaborData_10Jan2022.csv")
+labor_time_series <- head(labor, - 1) 
+# make dataframe to a big melted dataframe
+labor_df <- melt(labor_time_series,  id.vars = 'X', variable.name = 'countries')
+labor_df$countries <- as.character(labor_df$countries)
+#make all 0 to NA in labor_df
+labor_df[labor_df == "0"] <- NA
+# merge region to dataframe
+labor_df$countries[labor_df$countries == "CAR"] <- "Central African Republic"
+labor_df$ISO3 <- countrycode(sourcevar =labor_df$countries ,
+                            origin = "country.name" , destination = "iso3c")
+labor_df <- left_join(labor_df, region, by = "ISO3")
+#rotate labor dataframe
+labor_sum <- as.data.frame(t(labor))
+#use first row as column names
+colnames(labor_sum) <- labor_sum[1,]
+# delete first row
+labor_sum <-labor_sum[-1, ] 
+#add a new column of row names
+labor_sum$countries <- rownames(labor_sum) 
+labor_sum[labor_sum == "CAR"] <- "Central African Republic"
+labor_sum$ISO3 <- countrycode(sourcevar =labor_sum$countries ,
+                            origin = "country.name" , destination = "iso3c")
+labor_post <- left_join(posts, labor_sum, by = "ISO3")
+#delete all space in value
+labor_post$`sum_18-20` <- trimws(labor_post$`sum_18-20`, which = c("left"))
+# replace 0 with na
+labor_post$`sum_18-20`[labor_post$`sum_18-20` == 0] <- NA
+```
+
+#### time seires for all countries
+```{r fig15, fig.height=8, fig.width=10, message=FALSE, warning=FALSE}
+p15 <- ggplot(data = labor_df, aes(X, value)) +
+  geom_point(aes(colour = region), size=1) +
+  facet_wrap(~ countries, ncol = 8) +
+  labs(title = "Chinese Workers in African Countries",
+           subtitle = "Data plotted by country",
+           y = "",
+           x = "Year: 2009-2020") +
+  theme_light(base_size = 9) +
+  theme(strip.background = element_rect(fill = "darkslategray4"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.text.x = element_blank(),
+        axis.line = element_line(colour = "gray"),
+        legend.key.size = unit(8, 'mm'),
+        legend.position="right")
+p15
+```
+
+#### Posts and Labor
+```{r Plot 16, results='asis', message=FALSE, warning=FALSE}
+# geom_smooth is at 95% confidence level
+p16 <- ggplot(labor_post, aes(x=log(post_obtained), y=log(as.numeric(`sum_18-20`)),
+                            label=ISO3)) + 
+  geom_point(shape=18, size= 3, color="blue")+
+  geom_text(size=3, hjust=1.1, vjust=0)+
+  geom_smooth(method=lm, color="red", fill="lightblue") +
+  labs(y = "Sum of Labor 2018-2020 (log)",
+       x = "Obtained Posts (log)") + 
+  theme_light() +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(colour = "gray"))
+p16
+```
+
+```{r results ='asis', message=FALSE, warning=FALSE}
+reg5 <- lm(log(as.numeric(`sum_18-20`)) ~ log(post_obtained), data= labor_post)
+cov_5 <- vcovHC(reg5)
+se_5 <- sqrt(diag(cov_5))
+
+reg5a <- lm(log(as.numeric(`sum_18-20`)) ~ log(total_post), data= labor_post)
+cov_5a <- vcovHC(reg5a)
+se_5a <- sqrt(diag(cov_5a))
+```
+
+### Loan data {.tabset}
+```{r}
+loan <- read.csv("LoanData_06April2021.csv")
+loan_time_series <- head(loan, - 1) 
+# make dataframe to a big melted dataframe
+loan_df <- melt(loan_time_series,  id.vars = 'X', variable.name = 'countries')
+loan_df$countries <- as.character(loan_df$countries)
+#make all 0 to NA in loan_df
+loan_df[loan_df == "0"] <- NA
+# merge region to dataframe
+loan_df$countries[loan_df$countries == "CAR"] <- "Central African Republic"
+loan_df[loan_df == "ROC"] <- "Republic of Congo"
+loan_df$ISO3 <- countrycode(sourcevar =loan_df$countries ,
+                            origin = "country.name" , destination = "iso3c")
+loan_df <- left_join(loan_df, region, by = "ISO3")
+#rotate loan dataframe
+loan_sum <- as.data.frame(t(loan))
+#use first row as column names
+colnames(loan_sum) <- loan_sum[1,]
+# delete first row
+loan_sum <-loan_sum[-1, ] 
+#add a new column of row names
+loan_sum$countries <- rownames(loan_sum) 
+loan_sum[loan_sum == "CAR"] <- "Central African Republic"
+loan_sum[loan_sum == "ROC"] <- "Republic of Congo"
+loan_sum$ISO3 <- countrycode(sourcevar =loan_sum$countries ,
+                            origin = "country.name" , destination = "iso3c")
+loan_post <- left_join(posts, loan_sum, by = "ISO3")
+#delete all space in value
+loan_post$`sum_18-19` <- trimws(loan_post$`sum_18-19`, which = c("left"))
+# replace 0 with na
+loan_post$`sum_18-19`[loan_post$`sum_18-19` == 0] <- NA
+```
+
+#### time seires for all countries
+```{r fig17, fig.height=8, fig.width=10, message=FALSE, warning=FALSE}
+p17 <- ggplot(data = loan_df, aes(X, value)) +
+  geom_point(aes(colour = region), size=1) +
+  facet_wrap(~ countries, ncol = 8) +
+  labs(title = "Country Annual Loan Value by Year",
+           subtitle = "Data plotted by country",
+           y = "",
+           x = "Year: 2000-2019") +
+  theme_light(base_size = 9) +
+  theme(strip.background = element_rect(fill = "darkslategray4"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.text.x = element_blank(),
+        axis.line = element_line(colour = "gray"),
+        legend.key.size = unit(8, 'mm'),
+        legend.position="right")
+p17
+```
+
+#### Posts and loan
+```{r Plot 18, results='asis', message=FALSE, warning=FALSE}
+# geom_smooth is at 95% confidence level
+p18 <- ggplot(loan_post, aes(x=log(post_obtained), y=log(as.numeric(`sum_18-19`)),
+                            label=ISO3)) + 
+  geom_point(shape=18, size= 3, color="blue")+
+  geom_text(size=3, hjust=1.1, vjust=0)+
+  geom_smooth(method=lm, color="red", fill="lightblue") +
+  labs(y = "Sum of Loan 2018-2019 (log)",
+       x = "Obtained Posts (log)") + 
+  theme_light() +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(colour = "gray"))
+p18
+```
+
+```{r results ='asis', message=FALSE, warning=FALSE}
+reg6 <- lm(log(as.numeric(`sum_18-19`)) ~ log(post_obtained), data= loan_post)
+cov_6 <- vcovHC(reg6)
+se_6 <- sqrt(diag(cov_6))
+
+reg6a <- lm(log(as.numeric(`sum_18-19`)) ~ log(total_post), data= loan_post)
+cov_6a <- vcovHC(reg6a)
+se_6a <- sqrt(diag(cov_6a))
+```
+
+### Trade Data {.tabset}
+China's Exports to Africa
+```{r}
+trade <- read.csv("TradeData_10Jan2022.csv")
+trade_time_series <- head(trade, - 1) 
+# make dataframe to a big melted dataframe
+trade_df <- melt(trade_time_series,  id.vars = 'X', variable.name = 'countries')
+trade_df$countries <- as.character(trade_df$countries)
+#make all 0 to NA in trade_df
+trade_df[trade_df == "0"] <- NA
+# merge region to dataframe
+trade_df$ISO3 <- countrycode(sourcevar =trade_df$countries ,
+                            origin = "country.name" , destination = "iso3c")
+trade_df <- left_join(trade_df, region, by = "ISO3")
+#rotate dataframe
+trade_sum <- as.data.frame(t(trade))
+#use first row as column names
+colnames(trade_sum) <- trade_sum[1,]
+# delete first row
+trade_sum <-trade_sum[-1, ] 
+#add a new column of row names
+trade_sum$countries <- rownames(trade_sum) 
+trade_sum$ISO3 <- countrycode(sourcevar =trade_sum$countries ,
+                            origin = "country.name" , destination = "iso3c")
+trade_post <- left_join(posts, trade_sum, by = "ISO3")
+#delete all space in value
+trade_post$`sum_18-20` <- trimws(trade_post$`sum_18-20`, which = c("left"))
+# replace 0 with na
+trade_post$`sum_18-20`[trade_post$`sum_18-20` == "0.00"] <- NA
+```
+
+#### time seires for all countries
+```{r fig19, fig.height=8, fig.width=10, message=FALSE, warning=FALSE}
+p19 <- ggplot(data = trade_df, aes(X, value)) +
+  geom_point(aes(colour = region), size=0.5) +
+  facet_wrap(~ countries, ncol = 8) +
+  labs(title = "China's Exports to Africa",
+           subtitle = "Data plotted by country",
+           y = "",
+           x = "Year: 1992-2020") +
+  theme_light(base_size = 9) +
+  theme(strip.background = element_rect(fill = "darkslategray4"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.text.x = element_blank(),
+        axis.line = element_line(colour = "gray"),
+        legend.key.size = unit(8, 'mm'),
+        legend.position="right")
+p19
+```
+
+#### Posts and trade
+```{r Plot 20, results='asis', message=FALSE, warning=FALSE}
+# geom_smooth is at 95% confidence level
+p20 <- ggplot(trade_post, aes(x=log(post_obtained), y=log(as.numeric(`sum_18-20`)),
+                            label=ISO3)) + 
+  geom_point(shape=18, size= 3, color="blue")+
+  geom_text(size=3, hjust=1.1, vjust=0)+
+  geom_smooth(method=lm, color="red", fill="lightblue") +
+  labs(y = "Sum of Trade 2018-2020 (log)",
+       x = "Obtained Posts (log)") + 
+  theme_light() +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(colour = "gray"))
+p20
+```
+
+```{r results ='asis', message=FALSE, warning=FALSE}
+reg7 <- lm(log(as.numeric(`sum_18-20`)) ~ log(post_obtained), data= trade_post)
+cov_7 <- vcovHC(reg7)
+se_7 <- sqrt(diag(cov_7))
+
+reg7a <- lm(log(as.numeric(`sum_18-20`)) ~ log(total_post), data= trade_post)
+cov_7a <- vcovHC(reg7a)
+se_7a <- sqrt(diag(cov_7a))
+```
+
+### Aid Data 
+```{r}
+aid <- read.csv("AidDatasGlobalChineseDevelopmentFinanceDataset_v2.0.csv")
+aid$id <- countrycode(sourcevar =aid$country ,
+origin = "country.name", destination = "iso3c")
+aid <- subset(aid, select = c("project", "id"))
+aid_post <- left_join(posts, aid, by = "id")
+aid_post$project[aid_post$project == 0] <- NA
+```
+
+#### Posts and aid project
+```{r Plot 21, results='asis', message=FALSE, warning=FALSE}
+# geom_smooth is at 95% confidence level
+p21 <- ggplot(aid_post, aes(x=log(post_obtained), y=log(as.numeric(`project`)),
+                            label=id)) + 
+  geom_point(shape=18, size= 3, color="blue")+
+  geom_text(size=3, hjust=1.1, vjust=0)+
+  geom_smooth(method=lm, color="red", fill="lightblue") +
+  labs(y = "Aid Projects (log)",
+       x = "Obtained Posts (log)") + 
+  theme_light() +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(colour = "gray"))
+p21
+```
+
+
+```{r results ='asis', message=FALSE, warning=FALSE}
+reg8 <- lm(log(as.numeric(`project`)) ~ log(post_obtained), data= aid_post)
+cov_8 <- vcovHC(reg8)
+se_8 <- sqrt(diag(cov_8))
+
+reg8a <- lm(log(as.numeric(`project`)) ~ log(total_post), data= aid_post)
+cov_8a <- vcovHC(reg8a)
+se_8a <- sqrt(diag(cov_8a))
+```
+
+## Descriptions of Afrobarometer {.tabset}
+### Round 6  {.tabset}
+```{r}
+round6 <- read_sav("merged_r6_data_2016_36countries2.sav", encoding = "latin1")
+round6 <- transform(round6, name = substr(RESPNO, 1, 3))
+# select questions about China from round 6
+round6_china <- subset(round6, select = c(RESPNO, name, Q81A, Q81B, Q81C, Q81D,
+                                          Q81E))
+#select obtained posts column from posts
+posts_sub <- subset(posts, select = c(country, id, post_obtained, total_post))
+#change the country name in order to match the name in survey
+posts_sub$country[posts_sub$country == "Burundi"] <- "BDI"
+posts_sub$country[posts_sub$country == "Burkina Faso"] <- "BFO"
+posts_sub$country[posts_sub$country == "Ivory Coast"] <- "CDI"
+posts_sub$country[posts_sub$country == "Cape Verde"] <- "CVE"
+posts_sub$country[posts_sub$country == "Mali"] <- "MLI"
+posts_sub$country[posts_sub$country == "Malawi"] <- "MLW"
+posts_sub$country[posts_sub$country == "Niger"] <- "NGR"
+posts_sub$country[posts_sub$country == "South Africa"] <- "SAF"
+posts_sub$country[posts_sub$country == "Sierra Leone"] <- "SRL"
+posts_sub$country[posts_sub$country == "Sao Tome and Principe"] <- "STP"
+posts_sub$country[posts_sub$country == "Eswatini"] <- "SWZ"
+#choose the first three characters of country and capitalize them
+posts_sub <- transform(posts_sub, name = substr(country, 1, 3))
+posts_sub$name <- toupper(posts_sub$name)
+#merge two datasets
+round6_china <- left_join(round6_china, posts_sub, by = "name")
+#recode the answer
+round6_china$Q81A[as.numeric(round6_china$Q81A) == "9"] <- 0
+round6_china$Q81A[as.numeric(round6_china$Q81A) == "99"] <- 0
+round6_china$Q81A[as.numeric(round6_china$Q81A) == "-1"] <- NA
+#new column which contains ios3 and obtained posts
+round6_china$id_posts <- paste(round6_china$id, "(", round6_china$post_obtained,")")
+```
+
+#### Q81A: China's influence on economy 
+How much influence do you think China’s economic activities in [ENTER COUNTRY] have on our economy, or haven’t you heard enough to say?
+```{r fig22, fig.height=8, fig.width=10, message=FALSE, warning=FALSE}
+p22 <- ggplot(data = round6_china, aes(x = Q81A)) + 
+      geom_bar(fill="blue", color="black") +
+      scale_x_continuous(breaks=seq(0,3,1))+
+      scale_y_continuous(expand = c(0,0))+
+      facet_wrap(~ id, ncol = 4) +
+      labs(title = "China's influence on economy",
+           caption = "0=None / Don’t know / Haven’t heard enough/Refused to answer, 1= A little, 2= Some, 3=A lot",
+           y = "",
+           x= "") + 
+      theme_bw(base_size = 10) +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p22
+```
+
+
+```{r results ='asis', message=FALSE, warning=FALSE}
+reg9 <- lm(as.numeric(`Q81A`) ~ log(post_obtained), data= round6_china)
+cov_9 <- vcovHC(reg9)
+se_9 <- sqrt(diag(cov_9))
+
+reg9a <- lm(as.numeric(`Q81A`) ~ log(total_post), data= round6_china)
+cov_9a <- vcovHC(reg9a)
+se_9a <- sqrt(diag(cov_9a))
+```
+
+#### Q81B: China's influence: positive or negative
+In general, do you think that China’s economic and political influence on [ENTER COUNTRY] is mostly positive, or mostly negative, or haven’t you heard enough to say?
+```{r}
+q81b <- subset(round6_china, select=c("RESPNO","Q81B","country","id",
+                                      "post_obtained","total_post"))
+#recode the answer
+q81b$Q81B[as.numeric(q81b$Q81B) == "9"] <- 0
+q81b$Q81B[as.numeric(q81b$Q81B) == "99"] <- 0
+q81b$Q81B[as.numeric(q81b$Q81B) == "-1"] <- NA
+```
+
+```{r fig23, fig.height=8, fig.width=10, message=FALSE, warning=FALSE}
+p23 <- ggplot(data = q81b, aes(x = Q81B)) + 
+      geom_bar(fill="blue", color="black") +
+      scale_x_continuous(breaks=seq(0,5,1))+
+      scale_y_continuous(expand = c(0,0))+
+      facet_wrap(~ id, ncol = 4) +
+      labs(title = "China's influence: positive or negative",
+           caption = "0=Don’t know / Haven’t heard enough/Refused to answer, 1= Very negative, 2= Somewhat negative, \n3=Neither positive nor negative, 4= Somewhat positive, 5=Very positive",
+           y = "",
+           x= "") + 
+      theme_bw(base_size = 10) +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p23
+```
+
+```{r results ='asis', message=FALSE, warning=FALSE}
+reg10 <- lm(as.numeric(`Q81B`) ~ log(post_obtained), data= q81b)
+cov_10 <- vcovHC(reg10)
+se_10 <- sqrt(diag(cov_10))
+
+reg10a <- lm(as.numeric(`Q81B`) ~ log(total_post), data= q81b)
+cov_10a <- vcovHC(reg10a)
+se_10a <- sqrt(diag(cov_10a))
+```
+
+#### Q81C: Positive image of China
+Which of the following factors contributes most to positive image of China in [ENTER COUNTRY], or haven’t you heard enough to say?
+```{r}
+q81c <- subset(round6_china, select=c("RESPNO","Q81C","country","id",
+                                      "post_obtained","total_post"))
+#recode the answer
+q81c$Q81C[as.numeric(q81c$Q81C) == "9"] <- 0
+q81c$Q81C[as.numeric(q81c$Q81C) == "99"] <- 0
+q81c$Q81C[as.numeric(q81c$Q81C) == "-1"] <- NA
+```
+
+```{r fig24, fig.height=10, fig.width=12, message=FALSE, warning=FALSE}
+p24 <- ggplot(data = q81c, aes(x = Q81C)) + 
+      geom_bar(fill="blue", color="black") +
+      scale_x_continuous(breaks=seq(0,7,1))+
+      scale_y_continuous(expand = c(0,0))+
+      facet_wrap(~ id, ncol = 4) +
+      labs(title = "Postive image of China",
+           caption = "0=Don’t know / Haven’t heard enough/Refused to answer, 1=China’s support in international affairs, \n2=China’s policy of non- interference in the internal affairs of African countries, \n3=China’s investment in infrastructure or other development, 4=China’s business investment, \n5=The cost of Chinese products, 6=An appreciation of the Chinese people, culture and language, 7=Some other factor",
+           y = "",
+           x= "") + 
+      theme_bw(base_size = 10) +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p24
+```
+
+#### Q81D: Negative image of China
+Which of the following factors contributes most to negative images of China in [ENTER COUNTRY], or haven’t you heard enough to say?
+```{r}
+q81d <- subset(round6_china, select=c("RESPNO","Q81D","country","id",
+                                      "post_obtained","total_post"))
+#recode the answer
+q81d$Q81D[as.numeric(q81d$Q81D) == "9"] <- 0
+q81d$Q81D[as.numeric(q81d$Q81D) == "99"] <- 0
+q81d$Q81D[as.numeric(q81d$Q81D) == "-1"] <- NA
+```
+
+```{r fig25, fig.height=10, fig.width=12, message=FALSE, warning=FALSE}
+p25 <- ggplot(data = q81d, aes(x = Q81D)) + 
+      geom_bar(fill="blue", color="black") +
+      scale_x_continuous(breaks=seq(0,7,1))+
+      scale_y_continuous(expand = c(0,0))+
+      facet_wrap(~ id, ncol = 4) +
+      labs(title = "Negative image of China",
+           caption = "0=Don’t know / Haven’t heard enough/Refused to answer, 1=China’s extraction of resources from Africa, \n2=Land grabbing by Chinese individuals or businesses, 3=China’s willingness to cooperate with undemocratic rulers in Africa, \n4=Chinese economic activities taking jobs or business, 5=The quality of Chinese products, \n6=The behavior of Chinese citizens, 7=Some other factor",
+           y = "",
+           x= "") + 
+      theme_bw(base_size = 10) +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p25
+```
+
+#### Q81E: China's assistance does a good job at meeting country's needs
+In your opinion, does China’s economic development assistance to [ENTER COUNTRY] do a good job or a bad job of meeting the country’s needs, or haven’t you heard enough to say?
+```{r}
+q81e <- subset(round6_china, select=c("RESPNO","Q81E","country","id",
+                                      "post_obtained","total_post"))
+#recode the answer
+q81e$Q81E[as.numeric(q81e$Q81E) == "98"] <- 0
+q81e$Q81E[as.numeric(q81e$Q81E) == "99"] <- 0
+q81e$Q81E[as.numeric(q81e$Q81E) == "7"] <- 0
+q81e$Q81E[as.numeric(q81e$Q81E) == "9"] <- 0
+q81e$Q81E[as.numeric(q81e$Q81E) == "-1"] <- NA
+```
+
+```{r fig26, fig.height=8, fig.width=10, message=FALSE, warning=FALSE}
+p26 <- ggplot(data = q81e, aes(x = Q81E)) + 
+      geom_bar(fill="blue", color="black") +
+      scale_x_continuous(breaks=seq(0,5,1))+
+      scale_y_continuous(expand = c(0,0))+
+      facet_wrap(~ id, ncol = 4) +
+      labs(title = "China's assistance does a good job at meeting country's needs",
+           caption = "0=Don’t know / Haven’t heard enough/Refused to answer, 1=Very bad job, 2=Somewhat bad job, \n3=Neither good nor bad job, 4=Somewhat good job, 5=Very good job",
+           y = "",
+           x= "") + 
+      theme_bw(base_size = 10) +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p26
+```
+
+```{r results ='asis', message=FALSE, warning=FALSE}
+reg11 <- lm(as.numeric(`Q81E`) ~ log(post_obtained), data= q81e)
+cov_11 <- vcovHC(reg11)
+se_11 <- sqrt(diag(cov_11))
+
+reg11a <- lm(as.numeric(`Q81E`) ~ log(total_post), data= q81e)
+cov_11a <- vcovHC(reg11a)
+se_11a <- sqrt(diag(cov_11a))
+```
+
+### Round 8  {.tabset}
+```{r}
+#round8 <- read.csv("round8.csv")
+#round8_china <- subset(round8, select = c(RESPNO, Q65A, Q65B, Q65C, Q65D,
+#                                          Q69B, Q70E))
+```
+
+
+## Regression tables {.tabset}
+### From Afrobarometer-Post
+```{r  Table 2, results ='asis', message=FALSE, warning=FALSE}
+stargazer(reg1,reg1a,reg2,reg2a,reg3,reg3a, type="html",
+          dep.var.labels = c("","",""),
+          column.labels = c("Population Size<br>(log)","GDP per capita<br>(log)", "GDP per capita<br>PPP(log)"),
+          covariate.labels= c("Obatined Posts(log)", "Total Posts(log)"),
+          se=list(se_1,se_1a,se_2,se_2a, se_3,se_3a), column.separate = c(2,2,2),
+          notes.align = "l",
+          notes = "PPP is purchasing power parity. Robust standard errors are in parentheses.")
+```
+
+### From hopkins_data & Aid data
+```{r  Table 3, results ='asis', message=FALSE, warning=FALSE}
+stargazer(reg4,reg4a,reg5,reg5a,reg6,reg6a,reg7,reg7a,reg8,reg8a, type="html",
+          dep.var.labels = c("","","","",""),
+          column.labels = c("Chinese FDI<br>(log)", "Labor<br>(log)", 
+                            "Loan<br>(log)", "Trade<br>(log)", "Aid Project<br>(log)"),
+          covariate.labels= c("Obatined Posts(log)", "Total Posts(log)"),
+          se=list(se_4,se_4a,se_5,se_5a,se_6,se_6a,se_7,se_7a,se_8,se_8a), 
+          column.separate = c(2,2,2,2,2),
+          notes.align = "l",
+          notes = "Chinese FDI, Labor, Trade is the sum of year 2018 to 2020. Loan is the sum of year 2018 to 2019. Robust standard errors are in parentheses.")
+```
+
+### Afrobarometer Survey {.tabset}
+```{r message=FALSE, warning=FALSE}
+library(MASS)
+reg9b <- polr(as.factor(`Q81A`) ~ log(post_obtained), data= round6_china, Hess=TRUE)
+reg9c <- polr(as.factor(`Q81A`) ~ log(total_post), data= round6_china, Hess=TRUE)
+reg10b <- polr(as.factor(`Q81B`) ~ log(post_obtained), data= q81b, Hess=TRUE)
+reg10c <- polr(as.factor(`Q81B`) ~ log(total_post), data= q81b, Hess=TRUE)
+reg11b <- polr(as.factor(`Q81E`) ~ log(post_obtained), data= q81e, Hess=TRUE)
+reg11c <- polr(as.factor(`Q81E`) ~ log(total_post), data= q81e, Hess=TRUE)
+```
+
+#### Q81A: China's influence on economy
+```{r Table 4, message=FALSE, warning=FALSE, results='asis'}
+tab_model(reg9,reg9a,reg9b,reg9c, p.style = "stars", show.ci = FALSE, collapse.se = TRUE, 
+          pred.labels = c("Intercept", "Obatined Posts(log)","Total Posts(log)", "None|A little", "A little|Some", "Some|A lot"), 
+          title = "China's influence on economy(se in parentheses)",
+          dv.labels = c("","","",""))
+```
+
+#### Q81B: China's influence: positive or negative
+```{r Table 5, message=FALSE, warning=FALSE, results='asis'}
+tab_model(reg10,reg10a,reg10b,reg10c, p.style = "stars", show.ci = FALSE, collapse.se = TRUE, 
+          pred.labels = c("Intercept", "Obatined Posts(log)","Total Posts(log)", 
+                          "None|Very negative", "Very negative|Somewaht negative", 
+                          "Somewaht negative|Neutral", "Neutral|Somewhat positive",
+                          "Somewhat positive|Very positive"), 
+          title = "China's influence: positive or negative(se in parentheses)",
+          dv.labels = c("","","",""))
+```
+
+#### Q81E: China's assistance does a good job at meeting country's needs
+```{r Table 6, message=FALSE, warning=FALSE, results='asis'}
+tab_model(reg11,reg11a,reg11b,reg11c, p.style = "stars", show.ci = FALSE, collapse.se = TRUE, 
+          pred.labels = c("Intercept", "Obatined Posts(log)","Total Posts(log)", 
+                          "None|Very bad", "Very bad|Somewaht bad", 
+                          "Somewaht bad|Neutral", "Neutral|Somewhat good",
+                          "Somewhat good|Very good"), 
+          title = "China's assistance does a good job at meeting country's needs(se in parentheses)",
+          dv.labels = c("","","",""))
+```
