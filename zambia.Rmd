@@ -1,0 +1,2046 @@
+---
+title: "zambia"
+author: "Zixin"
+date: "2022-08-16"
+output:
+  html_document:
+    keep_md: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,fig.width=9, fig.height=6)
+if(!require("haven")) {install.packages("haven"); library("haven")}
+if(!require("ggplot2")) {install.packages("ggplot2"); library("ggplot2")}
+if(!require("dplyr")) {install.packages("dplyr"); library("dplyr")}
+if(!require("reshape2")) {install.packages("reshape2"); library("reshape2")}
+if(!require("wesanderson")) {install.packages("wesanderson"); library("wesanderson")}
+if(!require("stringr")) {install.packages("stringr"); library("stringr")}
+```
+
+```{r include=FALSE}
+zambia <- read_sav("zam_r6_data_eng.sav", encoding = "latin1")
+rawdata <- read.csv("zambia rawdata hangwei.csv")
+rawdata = rawdata[-1,]
+```
+
+## Afrobarometer Round 6  {.tabset}
+### Q80a. Model country for development
+In your opinion, which of the following countries, if any, would be the best model for the future development of our country?
+```{r include=FALSE}
+q80a <- subset(zambia, select=c("RESPNO","Q80A", "withinwt", "URBRUR", "Q97", "Q113", "Q96A"))
+#recode the answer
+q80a$Q80A[as.numeric(q80a$Q80A) == "-1"] <- NA
+
+q80a <- na.omit(q80a)
+```
+
+```{r Plot 1, echo=FALSE, message=FALSE, warning=FALSE}
+cname <- c("None \nof \nthese\n", "U.S.", "China", "Former \nColonial \nPower", "India", "South \nAfrica", "Own \nCountry", "Others", "Don't know")
+p <- q80a %>%
+  group_by(Q80A) %>%
+  summarise(value = sum(withinwt)) %>%
+  ggplot(aes(x = as.factor(Q80A), y = value)) + 
+      geom_col(fill="blue", color="black") +
+      scale_x_discrete(labels = cname)+
+      scale_y_continuous(labels = scales::comma, expand = c(0,0,0,5))+
+      labs(title = "Model country for development",
+           y = "Observations",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+#### Urban and Rural
+```{r Plot 1.1, echo=FALSE, message=FALSE, warning=FALSE}
+cname <- c("None \nof \nthese\n", "U.S.", "China", "Former \nColonial \nPower", "India", "South \nAfrica", "Own \nCountry", "Others", "Don't know")
+p <- q80a %>%
+  group_by(Q80A) %>%
+  summarise(urban = sum(withinwt[as.numeric(URBRUR) == "1" ]),
+            rural = sum(withinwt[as.numeric(URBRUR) == "2" ])) %>%
+  melt(id.vars='Q80A') %>%
+  group_by(Q80A) %>% 
+    mutate(ratio = value/sum(value),
+           ratio = scales::percent(ratio, accuracy = 1),
+           ratio = ifelse(ratio == "0%", NA, ratio )) %>%
+  ggplot(aes(x = as.factor(Q80A), y = value, fill = variable)) + 
+      geom_col(stat='identity', position="fill") +
+      geom_text(aes(label=ratio),size=2, position=position_fill(vjust=0.5)) +
+      scale_x_discrete(labels = cname)+
+      scale_y_continuous(labels = scales::comma, expand = c(0,0,0.05,0))+
+      labs(title = "Model country for development (Urban and Rural)",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+#### Education
+```{r Plot 1.2, echo=FALSE, message=FALSE, warning=FALSE}
+cname <- c("None \nof \nthese\n", "U.S.", "China", "Former \nColonial \nPower", "India", "South \nAfrica", "Own \nCountry", "Others", "Don't know")
+color <- c( "#C4961A", "#999999","#FFDB6D","orange","coral1","#D16103","#00AFBB", "#C3D7A4", "#52854C",  "#F4EDCA", "#4E84C4")
+
+p <- q80a %>%
+  group_by(Q80A) %>%
+  summarise(no_schooling = sum(withinwt[as.numeric(Q97) == "0" ]),
+            informal_only = sum(withinwt[as.numeric(Q97) == "1" ]),
+            some_primary = sum(withinwt[as.numeric(Q97) == "2"]),
+            primary_completed = sum(withinwt[as.numeric(Q97) == "3"]),
+            some_secondary = sum(withinwt[as.numeric(Q97) == "4"]),
+            secondary_completed = sum(withinwt[as.numeric(Q97) == "5"]),
+            post_secondary = sum(withinwt[as.numeric(Q97) == "6"]),
+            some_university = sum(withinwt[as.numeric(Q97) == "7"]),
+            university_completed = sum(withinwt[as.numeric(Q97) == "8"]),
+            post_graduate = sum(withinwt[as.numeric(Q97) == "9"]),
+            unknow = sum(withinwt[as.numeric(Q97) == "99"]) + 
+                     sum(withinwt[as.numeric(Q97) == "-1"]) +
+                     sum(withinwt[as.numeric(Q97) == "98"])
+            ) %>%
+  melt(id.vars='Q80A') %>%
+  group_by(Q80A) %>% 
+    mutate(ratio = value/sum(value),
+           ratio = scales::percent(ratio, accuracy = 1),
+           ratio = ifelse(ratio == "0%", NA, ratio )) %>%
+  ggplot(aes(x = as.factor(Q80A), y = value, fill = variable)) + 
+      geom_col(stat='identity', position="fill") +
+      geom_text(aes(label=ratio),size=2, position=position_fill(vjust=0.5)) +
+      scale_fill_manual(values = color) +
+      scale_x_discrete(labels = cname)+
+      scale_y_continuous(labels = scales::comma, expand = c(0,0,0.05,0))+
+      labs(title = "Model country for development (Education)",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+
+
+#### Age
+```{r Plot 1.3, echo=FALSE, message=FALSE, warning=FALSE}
+cname <- c("None \nof \nthese\n", "U.S.", "China", "Former \nColonial \nPower", "India", "South \nAfrica", "Own \nCountry", "Others", "Don't know")
+
+p <- q80a %>%
+  group_by(Q80A) %>%
+  summarise("20-29" = sum(withinwt[as.numeric(Q113) >= "20" & as.numeric(Q113) <= "29"]),
+            "30-39" = sum(withinwt[as.numeric(Q113) >= "30" & as.numeric(Q113) <= "39"]),
+            "40-49" = sum(withinwt[as.numeric(Q113) >= "40" & as.numeric(Q113) <= "49"]),
+            "50-59" = sum(withinwt[as.numeric(Q113) >= "50" & as.numeric(Q113) <= "59"])) %>%
+  melt(id.vars='Q80A') %>%
+  group_by(Q80A) %>% 
+    mutate(ratio = value/sum(value),
+           ratio = scales::percent(ratio, accuracy = 1),
+           ratio = ifelse(ratio == "0%", NA, ratio )) %>%
+  ggplot(aes(x = as.factor(Q80A), y = value, fill = variable)) + 
+      geom_col(stat='identity', position="fill") +
+      geom_text(aes(label=ratio),size=2, position=position_fill(vjust=0.5)) +
+      scale_fill_manual(values=wes_palette(n=4, name="Darjeeling1")) +
+      scale_x_discrete(labels = cname)+
+      scale_y_continuous(labels = scales::comma, expand = c(0,0,0.05,0))+
+      labs(title = "Model country for development (Age)",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+### Q80b. Country with most influence
+I Which of the following do you think has the most influence on Zambia, or haven‟t you heard enough to say?
+```{r include=FALSE}
+q80b <- subset(zambia, select=c("RESPNO","Q80B", "withinwt", "URBRUR", "Q97", "Q113", "Q96A"))
+#recode the answer
+q80b$Q80B[as.numeric(q80b$Q80B) == "-1"] <- NA
+
+q80b <- na.omit(q80b)
+```
+
+```{r Plot 2, echo=FALSE, message=FALSE, warning=FALSE}
+cname <- c("None have \nmuch Influence", "U.S.", "China", "Former \nColonial \nPower", "India", "South \nAfrica", "International \norganizations", "Others", "Don't know")
+p <- q80b %>%
+  group_by(Q80B) %>%
+  summarise(value = sum(withinwt)) %>%
+  ggplot(aes(x = as.factor(Q80B), y = value)) + 
+      geom_col(fill="blue", color="black") +
+      scale_x_discrete(labels = cname)+
+      scale_y_continuous(labels = scales::comma, expand = c(0,0,0,5))+
+      labs(title = "Country with most influence",
+           y = "Observations",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+#### Urban and Rural
+```{r Plot 2.1, echo=FALSE, message=FALSE, warning=FALSE}
+cname <- c("None have \nmuch Influence", "U.S.", "China", "Former \nColonial \nPower", "India", "South \nAfrica", "International \norganizations", "Others", "Don't know")
+p <- q80b %>%
+  group_by(Q80B) %>%
+  summarise(urban = sum(withinwt[as.numeric(URBRUR) == "1" ]),
+            rural = sum(withinwt[as.numeric(URBRUR) == "2" ])) %>%
+  melt(id.vars='Q80B') %>%
+  group_by(Q80B) %>% 
+    mutate(ratio = value/sum(value),
+           ratio = scales::percent(ratio, accuracy = 1),
+           ratio = ifelse(ratio == "0%", NA, ratio )) %>%
+  ggplot(aes(x = as.factor(Q80B), y = value, fill = variable)) + 
+      geom_col(stat='identity', position="fill") +
+      geom_text(aes(label=ratio),size=2, position=position_fill(vjust=0.5)) +
+      scale_x_discrete(labels = cname)+
+      scale_y_continuous(labels = scales::comma, expand = c(0,0,0.05,0))+
+      labs(title = "Country with most influence (Urban and Rural)",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+#### Education
+```{r Plot 2.2, echo=FALSE, message=FALSE, warning=FALSE}
+cname <- c("None have \nmuch Influence", "U.S.", "China", "Former \nColonial \nPower", "India", "South \nAfrica", "International \norganizations", "Others", "Don't know")
+color <- c( "#C4961A", "#999999","#FFDB6D","orange","coral1","#D16103","#00AFBB", "#C3D7A4", "#52854C",  "#F4EDCA", "#4E84C4")
+
+p <- q80b %>%
+  group_by(Q80B) %>%
+  summarise(no_schooling = sum(withinwt[as.numeric(Q97) == "0" ]),
+            informal_only = sum(withinwt[as.numeric(Q97) == "1" ]),
+            some_primary = sum(withinwt[as.numeric(Q97) == "2"]),
+            primary_completed = sum(withinwt[as.numeric(Q97) == "3"]),
+            some_secondary = sum(withinwt[as.numeric(Q97) == "4"]),
+            secondary_completed = sum(withinwt[as.numeric(Q97) == "5"]),
+            post_secondary = sum(withinwt[as.numeric(Q97) == "6"]),
+            some_university = sum(withinwt[as.numeric(Q97) == "7"]),
+            university_completed = sum(withinwt[as.numeric(Q97) == "8"]),
+            post_graduate = sum(withinwt[as.numeric(Q97) == "9"]),
+            unknow = sum(withinwt[as.numeric(Q97) == "99"]) + 
+                     sum(withinwt[as.numeric(Q97) == "-1"]) +
+                     sum(withinwt[as.numeric(Q97) == "98"])
+            ) %>%
+  melt(id.vars='Q80B') %>%
+  group_by(Q80B) %>% 
+    mutate(ratio = value/sum(value),
+           ratio = scales::percent(ratio, accuracy = 1),
+           ratio = ifelse(ratio == "0%", NA, ratio )) %>%
+  ggplot(aes(x = as.factor(Q80B), y = value, fill = variable)) + 
+      geom_col(stat='identity', position="fill") +
+      geom_text(aes(label=ratio),size=2, position=position_fill(vjust=0.5)) +
+      scale_fill_manual(values = color) +
+      scale_x_discrete(labels = cname)+
+      scale_y_continuous(labels = scales::comma, expand = c(0,0,0.05,0))+
+      labs(title = "Country with most influence (Education)",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+
+
+#### Age
+```{r Plot 2.3, echo=FALSE, message=FALSE, warning=FALSE}
+cname <- c("None have \nmuch Influence", "U.S.", "China", "Former \nColonial \nPower", "India", "South \nAfrica", "International \norganizations", "Others", "Don't know")
+
+p <- q80b %>%
+  group_by(Q80B) %>%
+  summarise("20-29" = sum(withinwt[as.numeric(Q113) >= "20" & as.numeric(Q113) <= "29"]),
+            "30-39" = sum(withinwt[as.numeric(Q113) >= "30" & as.numeric(Q113) <= "39"]),
+            "40-49" = sum(withinwt[as.numeric(Q113) >= "40" & as.numeric(Q113) <= "49"]),
+            "50-59" = sum(withinwt[as.numeric(Q113) >= "50" & as.numeric(Q113) <= "59"])) %>%
+  melt(id.vars='Q80B') %>%
+  group_by(Q80B) %>% 
+    mutate(ratio = value/sum(value),
+           ratio = scales::percent(ratio, accuracy = 1),
+           ratio = ifelse(ratio == "0%", NA, ratio )) %>%
+  ggplot(aes(x = as.factor(Q80B), y = value, fill = variable)) + 
+      geom_col(stat='identity', position="fill") +
+      geom_text(aes(label=ratio),size=2, position=position_fill(vjust=0.5)) +
+      scale_fill_manual(values=wes_palette(n=4, name="Darjeeling1")) +
+      scale_x_discrete(labels = cname)+
+      scale_y_continuous(labels = scales::comma, expand = c(0,0,0.05,0))+
+      labs(title = "Country with most influence (Age)",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+
+### Q81a. China's influence on economy
+How much influence do you think China‟s economic activities in Zambia have on our economy, or haven‟t you heard enough to say?
+```{r include=FALSE}
+q81a <- subset(zambia, select=c("RESPNO","Q81A", "withinwt", "URBRUR", "Q97", "Q113", "Q96A"))
+#recode the answer
+q81a$Q81A[as.numeric(q81a$Q81A) == "-1"] <- NA
+
+q81a <- na.omit(q81a)
+```
+
+```{r Plot 3, echo=FALSE, message=FALSE, warning=FALSE}
+cname <- c("None", "A little", "Some", "A lot", "Don't know")
+p <- q81a %>%
+  group_by(Q81A) %>%
+  summarise(value = sum(withinwt)) %>%
+  ggplot(aes(x = as.factor(Q81A), y = value)) + 
+      geom_col(fill="blue", color="black") +
+      scale_x_discrete(labels = cname)+
+      scale_y_continuous(labels = scales::comma, expand = c(0,0,0,10))+
+      labs(title = "China's influence on economy",
+           y = "Observations",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+#### Urban and Rural
+```{r Plot 3.1, echo=FALSE, message=FALSE, warning=FALSE}
+cname <- c("None", "A little", "Some", "A lot", "Don't know")
+p <- q81a %>%
+  group_by(Q81A) %>%
+  summarise(urban = sum(withinwt[as.numeric(URBRUR) == "1" ]),
+            rural = sum(withinwt[as.numeric(URBRUR) == "2" ])) %>%
+  melt(id.vars='Q81A') %>%
+  group_by(Q81A) %>% 
+    mutate(ratio = value/sum(value),
+           ratio = scales::percent(ratio, accuracy = 1),
+           ratio = ifelse(ratio == "0%", NA, ratio )) %>%
+  ggplot(aes(x = as.factor(Q81A), y = value, fill = variable)) + 
+      geom_col(stat='identity', position="fill") +
+      geom_text(aes(label=ratio),size=2, position=position_fill(vjust=0.5)) +
+      scale_x_discrete(labels = cname)+
+      scale_y_continuous(labels = scales::comma, expand = c(0,0,0.05,0))+
+      labs(title = "China's influence on economy (Urban and Rural)",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+#### Education
+```{r Plot 3.2, echo=FALSE, message=FALSE, warning=FALSE}
+cname <- c("None", "A little", "Some", "A lot", "Don't know")
+
+color <- c( "#C4961A", "#999999","#FFDB6D","orange","coral1","#D16103","#00AFBB", "#C3D7A4", "#52854C",  "#F4EDCA", "#4E84C4")
+
+p <- q81a %>%
+  group_by(Q81A) %>%
+  summarise(no_schooling = sum(withinwt[as.numeric(Q97) == "0" ]),
+            informal_only = sum(withinwt[as.numeric(Q97) == "1" ]),
+            some_primary = sum(withinwt[as.numeric(Q97) == "2"]),
+            primary_completed = sum(withinwt[as.numeric(Q97) == "3"]),
+            some_secondary = sum(withinwt[as.numeric(Q97) == "4"]),
+            secondary_completed = sum(withinwt[as.numeric(Q97) == "5"]),
+            post_secondary = sum(withinwt[as.numeric(Q97) == "6"]),
+            some_university = sum(withinwt[as.numeric(Q97) == "7"]),
+            university_completed = sum(withinwt[as.numeric(Q97) == "8"]),
+            post_graduate = sum(withinwt[as.numeric(Q97) == "9"]),
+            unknow = sum(withinwt[as.numeric(Q97) == "99"]) + 
+                     sum(withinwt[as.numeric(Q97) == "-1"]) +
+                     sum(withinwt[as.numeric(Q97) == "98"])
+            ) %>%
+  melt(id.vars='Q81A') %>%
+  group_by(Q81A) %>% 
+    mutate(ratio = value/sum(value),
+           ratio = scales::percent(ratio, accuracy = 1),
+           ratio = ifelse(ratio == "0%", NA, ratio )) %>%
+  ggplot(aes(x = as.factor(Q81A), y = value, fill = variable)) + 
+      geom_col(stat='identity', position="fill") +
+      geom_text(aes(label=ratio),size=2, position=position_fill(vjust=0.5)) +
+      scale_fill_manual(values = color) +
+      scale_x_discrete(labels = cname)+
+      scale_y_continuous(labels = scales::comma, expand = c(0,0,0.05,0))+
+      labs(title = "China's influence on economy (Education)",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+
+#### Age
+```{r Plot 3.3, echo=FALSE, message=FALSE, warning=FALSE}
+cname <- c("None", "A little", "Some", "A lot", "Don't know")
+
+p <- q81a %>%
+  group_by(Q81A) %>%
+  summarise("20-29" = sum(withinwt[as.numeric(Q113) >= "20" & as.numeric(Q113) <= "29"]),
+            "30-39" = sum(withinwt[as.numeric(Q113) >= "30" & as.numeric(Q113) <= "39"]),
+            "40-49" = sum(withinwt[as.numeric(Q113) >= "40" & as.numeric(Q113) <= "49"]),
+            "50-59" = sum(withinwt[as.numeric(Q113) >= "50" & as.numeric(Q113) <= "59"])) %>%
+  melt(id.vars='Q81A') %>%
+  group_by(Q81A) %>% 
+    mutate(ratio = value/sum(value),
+           ratio = scales::percent(ratio, accuracy = 1),
+           ratio = ifelse(ratio == "0%", NA, ratio )) %>%
+  ggplot(aes(x = as.factor(Q81A), y = value, fill = variable)) + 
+      geom_col(stat='identity', position="fill") +
+      geom_text(aes(label=ratio),size=2, position=position_fill(vjust=0.5)) +
+      scale_fill_manual(values=wes_palette(n=4, name="Darjeeling1")) +
+      scale_x_discrete(labels = cname)+
+      scale_y_continuous(labels = scales::comma, expand = c(0,0,0.05,0))+
+      labs(title = "China's influence on economy (Age)",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+
+
+### Q81b. China's influence: positive or negative
+In general, do you think that China‟s economic and political influence on Zambia is mostly positive, or mostly negative, or haven‟t you heard enough to say?
+```{r include=FALSE}
+q81b <- subset(zambia, select=c("RESPNO","Q81B", "withinwt", "URBRUR", "Q97", "Q113", "Q96A"))
+#recode the answer
+q81b$Q81B[as.numeric(q81b$Q81B) == "-1"] <- NA
+
+q81b <- na.omit(q81b)
+```
+
+```{r Plot 4, echo=FALSE, message=FALSE, warning=FALSE}
+cname <- c("Very negative", "Somewhat negative", "Neutral", "Somewhat positive","Very positive", "Don't know")
+p <- q81b %>%
+  group_by(Q81B) %>%
+  summarise(value = sum(withinwt)) %>%
+  ggplot(aes(x = as.factor(Q81B), y = value)) + 
+      geom_col(fill="blue", color="black") +
+      scale_x_discrete(labels = cname)+
+      scale_y_continuous(labels = scales::comma, expand = c(0,0,0,10))+
+      labs(title = "China's influence: positive or negative",
+           y = "Observations",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+#### Urban and Rural
+```{r Plot 4.1, echo=FALSE, message=FALSE, warning=FALSE}
+cname <- c("Very negative", "Somewhat negative", "Neutral", "Somewhat positive","Very positive", "Don't know")
+p <- q81b %>%
+  group_by(Q81B) %>%
+  summarise(urban = sum(withinwt[as.numeric(URBRUR) == "1" ]),
+            rural = sum(withinwt[as.numeric(URBRUR) == "2" ])) %>%
+  melt(id.vars='Q81B') %>%
+  group_by(Q81B) %>% 
+    mutate(ratio = value/sum(value),
+           ratio = scales::percent(ratio, accuracy = 1),
+           ratio = ifelse(ratio == "0%", NA, ratio )) %>%
+  ggplot(aes(x = as.factor(Q81B), y = value, fill = variable)) + 
+      geom_col(stat='identity', position="fill") +
+      geom_text(aes(label=ratio),size=2, position=position_fill(vjust=0.5)) +
+      scale_x_discrete(labels = cname)+
+      scale_y_continuous(labels = scales::comma, expand = c(0,0,0.05,0))+
+      labs(title = "China's influence: positive or negative (Urban and Rural)",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+#### Education
+```{r Plot 4.2, echo=FALSE, message=FALSE, warning=FALSE}
+cname <- c("Very negative", "Somewhat negative", "Neutral", "Somewhat positive","Very positive", "Don't know")
+color <- c( "#C4961A", "#999999","#FFDB6D","orange","coral1","#D16103","#00AFBB", "#C3D7A4", "#52854C",  "#F4EDCA", "#4E84C4")
+
+p <- q81b %>%
+  group_by(Q81B) %>%
+  summarise(no_schooling = sum(withinwt[as.numeric(Q97) == "0" ]),
+            informal_only = sum(withinwt[as.numeric(Q97) == "1" ]),
+            some_primary = sum(withinwt[as.numeric(Q97) == "2"]),
+            primary_completed = sum(withinwt[as.numeric(Q97) == "3"]),
+            some_secondary = sum(withinwt[as.numeric(Q97) == "4"]),
+            secondary_completed = sum(withinwt[as.numeric(Q97) == "5"]),
+            post_secondary = sum(withinwt[as.numeric(Q97) == "6"]),
+            some_university = sum(withinwt[as.numeric(Q97) == "7"]),
+            university_completed = sum(withinwt[as.numeric(Q97) == "8"]),
+            post_graduate = sum(withinwt[as.numeric(Q97) == "9"]),
+            unknow = sum(withinwt[as.numeric(Q97) == "99"]) + 
+                     sum(withinwt[as.numeric(Q97) == "-1"]) +
+                     sum(withinwt[as.numeric(Q97) == "98"])
+            ) %>%
+  melt(id.vars='Q81B') %>%
+  group_by(Q81B) %>% 
+    mutate(ratio = value/sum(value),
+           ratio = scales::percent(ratio, accuracy = 1),
+           ratio = ifelse(ratio == "0%", NA, ratio )) %>%
+  ggplot(aes(x = as.factor(Q81B), y = value, fill = variable)) + 
+      geom_col(stat='identity', position="fill") +
+      geom_text(aes(label=ratio),size=2, position=position_fill(vjust=0.5)) +
+      scale_fill_manual(values = color) +
+      scale_x_discrete(labels = cname)+
+      scale_y_continuous(labels = scales::comma, expand = c(0,0,0.05,0))+
+      labs(title = "China's influence: positive or negative (Education)",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+
+#### Age
+```{r Plot 4.3, echo=FALSE, message=FALSE, warning=FALSE}
+cname <- c("Very negative", "Somewhat negative", "Neutral", "Somewhat positive","Very positive", "Don't know")
+
+p <- q81b %>%
+  group_by(Q81B) %>%
+  summarise("20-29" = sum(withinwt[as.numeric(Q113) >= "20" & as.numeric(Q113) <= "29"]),
+            "30-39" = sum(withinwt[as.numeric(Q113) >= "30" & as.numeric(Q113) <= "39"]),
+            "40-49" = sum(withinwt[as.numeric(Q113) >= "40" & as.numeric(Q113) <= "49"]),
+            "50-59" = sum(withinwt[as.numeric(Q113) >= "50" & as.numeric(Q113) <= "59"])) %>%
+  melt(id.vars='Q81B') %>%
+  group_by(Q81B) %>% 
+    mutate(ratio = value/sum(value),
+           ratio = scales::percent(ratio, accuracy = 1),
+           ratio = ifelse(ratio == "0%", NA, ratio )) %>%
+  ggplot(aes(x = as.factor(Q81B), y = value, fill = variable)) + 
+      geom_col(stat='identity', position="fill") +
+      geom_text(aes(label=ratio),size=2, position=position_fill(vjust=0.5)) +
+      scale_fill_manual(values=wes_palette(n=4, name="Darjeeling1")) +
+      scale_x_discrete(labels = cname)+
+      scale_y_continuous(labels = scales::comma, expand = c(0,0,0.05,0))+
+      labs(title = "China's influence: positive or negative (Age)",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+
+### Q81c. Positive image of China
+Which of the following factors contributes most to positive image of China in Zambia, or haven‟t you heard enough to say?
+```{r include=FALSE}
+q81c <- subset(zambia, select=c("RESPNO","Q81C", "withinwt", "URBRUR", "Q97", "Q113", "Q96A"))
+#recode the answer
+q81c$Q81C[as.numeric(q81c$Q81C) == "-1"] <- NA
+
+q81c <- na.omit(q81c)
+```
+
+```{r Plot 5, echo=FALSE, message=FALSE, warning=FALSE}
+cname <- c("None", "Support in \ninternational \naffairs","Non-\ninterference \nfor \ninternal affairs", "Investment \nin \ninfrastructure", "Business \ninvestment","The quality \nor cost of \nChinese products","Appreciation","Others" ,"Don't know")
+p <- q81c %>%
+  group_by(Q81C) %>%
+  summarise(value = sum(withinwt)) %>%
+  ggplot(aes(x = as.factor(Q81C), y = value)) + 
+      geom_col(fill="blue", color="black") +
+      scale_x_discrete(labels = cname)+
+      scale_y_continuous(labels = scales::comma, expand = c(0,0,0,10))+
+      labs(title = "Positive image of China",
+           y = "Observations",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+#### Urban and Rural
+```{r Plot 5.1, echo=FALSE, message=FALSE, warning=FALSE}
+cname <- c("None", "Support in \ninternational \naffairs","Non-\ninterference \nfor \ninternal affairs", "Investment \nin \ninfrastructure", "Business \ninvestment","The quality \nor cost of \nChinese products","Appreciation","Others" ,"Don't know")
+p <- q81c %>%
+  group_by(Q81C) %>%
+  summarise(urban = sum(withinwt[as.numeric(URBRUR) == "1" ]),
+            rural = sum(withinwt[as.numeric(URBRUR) == "2" ])) %>%
+  melt(id.vars='Q81C') %>%
+  group_by(Q81C) %>% 
+    mutate(ratio = value/sum(value),
+           ratio = scales::percent(ratio, accuracy = 1),
+           ratio = ifelse(ratio == "0%", NA, ratio )) %>%
+  ggplot(aes(x = as.factor(Q81C), y = value, fill = variable)) + 
+      geom_col(stat='identity', position="fill") +
+      geom_text(aes(label=ratio),size=2, position=position_fill(vjust=0.5)) +
+      scale_x_discrete(labels = cname)+
+      scale_y_continuous(labels = scales::comma, expand = c(0,0,0.05,0))+
+      labs(title = "Positive image of China (Urban and Rural)",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+#### Education
+```{r Plot 5.2, echo=FALSE, message=FALSE, warning=FALSE}
+cname <- c("None", "Support in \ninternational \naffairs","Non-\ninterference \nfor \ninternal affairs", "Investment \nin \ninfrastructure", "Business \ninvestment","The quality \nor cost of \nChinese products","Appreciation","Others" ,"Don't know")
+color <- c( "#C4961A", "#999999","#FFDB6D","orange","coral1","#D16103","#00AFBB", "#C3D7A4", "#52854C",  "#F4EDCA", "#4E84C4")
+
+p <- q81c %>%
+  group_by(Q81C) %>%
+  summarise(no_schooling = sum(withinwt[as.numeric(Q97) == "0" ]),
+            informal_only = sum(withinwt[as.numeric(Q97) == "1" ]),
+            some_primary = sum(withinwt[as.numeric(Q97) == "2"]),
+            primary_completed = sum(withinwt[as.numeric(Q97) == "3"]),
+            some_secondary = sum(withinwt[as.numeric(Q97) == "4"]),
+            secondary_completed = sum(withinwt[as.numeric(Q97) == "5"]),
+            post_secondary = sum(withinwt[as.numeric(Q97) == "6"]),
+            some_university = sum(withinwt[as.numeric(Q97) == "7"]),
+            university_completed = sum(withinwt[as.numeric(Q97) == "8"]),
+            post_graduate = sum(withinwt[as.numeric(Q97) == "9"]),
+            unknow = sum(withinwt[as.numeric(Q97) == "99"]) + 
+                     sum(withinwt[as.numeric(Q97) == "-1"]) +
+                     sum(withinwt[as.numeric(Q97) == "98"])
+            ) %>%
+  melt(id.vars='Q81C') %>%
+  group_by(Q81C) %>% 
+    mutate(ratio = value/sum(value),
+           ratio = scales::percent(ratio, accuracy = 1),
+           ratio = ifelse(ratio == "0%", NA, ratio )) %>%
+  ggplot(aes(x = as.factor(Q81C), y = value, fill = variable)) + 
+      geom_col(stat='identity', position="fill") +
+      geom_text(aes(label=ratio),size=2, position=position_fill(vjust=0.5)) +
+      scale_fill_manual(values = color) +
+      scale_x_discrete(labels = cname)+
+      scale_y_continuous(labels = scales::comma, expand = c(0,0,0.05,0))+
+      labs(title = "Positive image of China (Education)",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+
+#### Age
+```{r Plot 5.3, echo=FALSE, message=FALSE, warning=FALSE}
+cname <- c("None", "Support in \ninternational \naffairs","Non-\ninterference \nfor \ninternal affairs", "Investment \nin \ninfrastructure", "Business \ninvestment","The quality \nor cost of \nChinese products","Appreciation","Others" ,"Don't know")
+
+p <- q81c %>%
+  group_by(Q81C) %>%
+  summarise("20-29" = sum(withinwt[as.numeric(Q113) >= "20" & as.numeric(Q113) <= "29"]),
+            "30-39" = sum(withinwt[as.numeric(Q113) >= "30" & as.numeric(Q113) <= "39"]),
+            "40-49" = sum(withinwt[as.numeric(Q113) >= "40" & as.numeric(Q113) <= "49"]),
+            "50-59" = sum(withinwt[as.numeric(Q113) >= "50" & as.numeric(Q113) <= "59"])) %>%
+  melt(id.vars='Q81C') %>%
+  group_by(Q81C) %>% 
+    mutate(ratio = value/sum(value),
+           ratio = scales::percent(ratio, accuracy = 1),
+           ratio = ifelse(ratio == "0%", NA, ratio )) %>%
+  ggplot(aes(x = as.factor(Q81C), y = value, fill = variable)) + 
+      geom_col(stat='identity', position="fill") +
+      geom_text(aes(label=ratio),size=2, position=position_fill(vjust=0.5)) +
+      scale_fill_manual(values=wes_palette(n=4, name="Darjeeling1")) +
+      scale_x_discrete(labels = cname)+
+      scale_y_continuous(labels = scales::comma, expand = c(0,0,0.05,0))+
+      labs(title = "Positive image of China (Age)",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+
+### Q81d. Negative image of China
+Which of the following factors contributes most to negative images of China in Zambia, or haven‟t you heard enough to say?
+```{r include=FALSE}
+q81d <- subset(zambia, select=c("RESPNO","Q81D", "withinwt", "URBRUR", "Q97", "Q113", "Q96A"))
+#recode the answer
+q81d$Q81D[as.numeric(q81d$Q81D) == "-1"] <- NA
+
+q81d <- na.omit(q81d)
+```
+
+```{r Plot 6, echo=FALSE, message=FALSE, warning=FALSE}
+cname <- c("None", "Extraction \nof \nresources","Land \ngrabbing", "Cooperate \nwith \nundemocratic \nrulers", "Taking jobs \nfrom locals","The quality \nof \nChinese \nproducts","Behavior","Others" ,"Don't know")
+p <- q81d %>%
+  group_by(Q81D) %>%
+  summarise(value = sum(withinwt)) %>%
+  ggplot(aes(x = as.factor(Q81D), y = value)) + 
+      geom_col(fill="blue", color="black") +
+      scale_x_discrete(labels = cname)+
+      scale_y_continuous(labels = scales::comma, expand = c(0,0,0,10))+
+      labs(title = "Negative image of China",
+           y = "Observations",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+#### Urban and Rural
+```{r Plot 6.1, echo=FALSE, message=FALSE, warning=FALSE}
+cname <- c("None", "Extraction \nof \nresources","Land \ngrabbing", "Cooperate \nwith \nundemocratic \nrulers", "Taking jobs \nfrom locals","The quality \nof \nChinese \nproducts","Behavior","Others" ,"Don't know")
+p <- q81d %>%
+  group_by(Q81D) %>%
+  summarise(urban = sum(withinwt[as.numeric(URBRUR) == "1" ]),
+            rural = sum(withinwt[as.numeric(URBRUR) == "2" ])) %>%
+  melt(id.vars='Q81D') %>%
+  group_by(Q81D) %>% 
+    mutate(ratio = value/sum(value),
+           ratio = scales::percent(ratio, accuracy = 1),
+           ratio = ifelse(ratio == "0%", NA, ratio )) %>%
+  ggplot(aes(x = as.factor(Q81D), y = value, fill = variable)) + 
+      geom_col(stat='identity', position="fill") +
+      geom_text(aes(label=ratio),size=2, position=position_fill(vjust=0.5)) +
+      scale_x_discrete(labels = cname)+
+      scale_y_continuous(labels = scales::comma, expand = c(0,0,0.05,0))+
+      labs(title = "Negative image of China (Urban and Rural)",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+#### Education
+```{r Plot 6.2, echo=FALSE, message=FALSE, warning=FALSE}
+cname <- c("None", "Extraction \nof \nresources","Land \ngrabbing", "Cooperate \nwith \nundemocratic \nrulers", "Taking jobs \nfrom locals","The quality \nof \nChinese \nproducts","Behavior","Others" ,"Don't know")
+color <- c( "#C4961A", "#999999","#FFDB6D","orange","coral1","#D16103","#00AFBB", "#C3D7A4", "#52854C",  "#F4EDCA", "#4E84C4")
+
+p <- q81d %>%
+  group_by(Q81D) %>%
+  summarise(no_schooling = sum(withinwt[as.numeric(Q97) == "0" ]),
+            informal_only = sum(withinwt[as.numeric(Q97) == "1" ]),
+            some_primary = sum(withinwt[as.numeric(Q97) == "2"]),
+            primary_completed = sum(withinwt[as.numeric(Q97) == "3"]),
+            some_secondary = sum(withinwt[as.numeric(Q97) == "4"]),
+            secondary_completed = sum(withinwt[as.numeric(Q97) == "5"]),
+            post_secondary = sum(withinwt[as.numeric(Q97) == "6"]),
+            some_university = sum(withinwt[as.numeric(Q97) == "7"]),
+            university_completed = sum(withinwt[as.numeric(Q97) == "8"]),
+            post_graduate = sum(withinwt[as.numeric(Q97) == "9"]),
+            unknow = sum(withinwt[as.numeric(Q97) == "99"]) + 
+                     sum(withinwt[as.numeric(Q97) == "-1"]) +
+                     sum(withinwt[as.numeric(Q97) == "98"])
+            ) %>%
+  melt(id.vars='Q81D') %>%
+  group_by(Q81D) %>% 
+    mutate(ratio = value/sum(value),
+           ratio = scales::percent(ratio, accuracy = 1),
+           ratio = ifelse(ratio == "0%", NA, ratio )) %>%
+  ggplot(aes(x = as.factor(Q81D), y = value, fill = variable)) + 
+      geom_col(stat='identity', position="fill") +
+      geom_text(aes(label=ratio),size=2, position=position_fill(vjust=0.5)) +
+      scale_fill_manual(values = color) +
+      scale_x_discrete(labels = cname)+
+      scale_y_continuous(labels = scales::comma, expand = c(0,0,0.05,0))+
+      labs(title = "Negative image of China (Education)",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            legend.text = element_text(size = 7),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+
+#### Age
+```{r Plot 6.3, echo=FALSE, message=FALSE, warning=FALSE}
+cname <- c("None", "Extraction \nof \nresources","Land \ngrabbing", "Cooperate \nwith \nundemocratic \nrulers", "Taking jobs \nfrom locals","The quality \nof \nChinese \nproducts","Behavior","Others" ,"Don't know")
+
+p <- q81d %>%
+  group_by(Q81D) %>%
+  summarise("20-29" = sum(withinwt[as.numeric(Q113) >= "20" & as.numeric(Q113) <= "29"]),
+            "30-39" = sum(withinwt[as.numeric(Q113) >= "30" & as.numeric(Q113) <= "39"]),
+            "40-49" = sum(withinwt[as.numeric(Q113) >= "40" & as.numeric(Q113) <= "49"]),
+            "50-59" = sum(withinwt[as.numeric(Q113) >= "50" & as.numeric(Q113) <= "59"])) %>%
+  melt(id.vars='Q81D') %>%
+  group_by(Q81D) %>% 
+    mutate(ratio = value/sum(value),
+           ratio = scales::percent(ratio, accuracy = 1),
+           ratio = ifelse(ratio == "0%", NA, ratio )) %>%
+  ggplot(aes(x = as.factor(Q81D), y = value, fill = variable)) + 
+      geom_col(stat='identity', position="fill") +
+      geom_text(aes(label=ratio),size=2, position=position_fill(vjust=0.5)) +
+      scale_fill_manual(values=wes_palette(n=4, name="Darjeeling1")) +
+      scale_x_discrete(labels = cname)+
+      scale_y_continuous(labels = scales::comma, expand = c(0,0,0.05,0))+
+      labs(title = "Negative image of China (Age)",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+### Q81e. China's assistance does a good job at meeting country's needs
+In your opinion, does China‟s economic development assistance to Zambia do a good job or a bad job of meeting the country‟s needs, or haven‟t you heard enough to say?
+```{r include=FALSE}
+q81e <- subset(zambia, select=c("RESPNO","Q81E", "withinwt", "URBRUR", "Q97", "Q113", "Q96A"))
+#recode the answer
+q81e$Q81E[as.numeric(q81e$Q81E) == "-1"] <- NA
+
+q81e <- na.omit(q81e)
+```
+
+```{r Plot 7, echo=FALSE, message=FALSE, warning=FALSE}
+cname <- c("Very bad", "Somewhat bad","Neutral", "Somewhat good", "Very good","No \ndevelopment \nassistance","Don't know")
+p <- q81e %>%
+  group_by(Q81E) %>%
+  summarise(value = sum(withinwt)) %>%
+  ggplot(aes(x = as.factor(Q81E), y = value)) + 
+      geom_col(fill="blue", color="black") +
+      scale_x_discrete(labels = cname)+
+      scale_y_continuous(labels = scales::comma, expand = c(0,0,0,10))+
+      labs(title = "China's assistance does a good job at meeting country's needs",
+           y = "Observations",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+#### Urban and Rural
+```{r Plot 7.1, echo=FALSE, message=FALSE, warning=FALSE}
+cname <- c("Very bad", "Somewhat bad","Neutral", "Somewhat good", "Very good","No \ndevelopment \nassistance","Don't know")
+
+p <- q81e %>%
+  group_by(Q81E) %>%
+  summarise(urban = sum(withinwt[as.numeric(URBRUR) == "1" ]),
+            rural = sum(withinwt[as.numeric(URBRUR) == "2" ])) %>%
+  melt(id.vars='Q81E') %>%
+  group_by(Q81E) %>% 
+    mutate(ratio = value/sum(value),
+           ratio = scales::percent(ratio, accuracy = 1),
+           ratio = ifelse(ratio == "0%", NA, ratio )) %>%
+  ggplot(aes(x = as.factor(Q81E), y = value, fill = variable)) + 
+      geom_col(stat='identity', position="fill") +
+      geom_text(aes(label=ratio),size=2, position=position_fill(vjust=0.5)) +
+      scale_x_discrete(labels = cname)+
+      scale_y_continuous(labels = scales::comma, expand = c(0,0,0.05,0))+
+      labs(title = "China's assistance does a good job at meeting country's needs \n(Urban and Rural)",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+#### Education
+```{r Plot 7.2, echo=FALSE, message=FALSE, warning=FALSE}
+cname <- c("Very bad", "Somewhat bad","Neutral", "Somewhat good", "Very good","No \ndevelopment \nassistance","Don't know")
+color <- c( "#C4961A", "#999999","#FFDB6D","orange","coral1","#D16103","#00AFBB", "#C3D7A4", "#52854C",  "#F4EDCA", "#4E84C4")
+
+p <- q81e %>%
+  group_by(Q81E) %>%
+  summarise(no_schooling = sum(withinwt[as.numeric(Q97) == "0" ]),
+            informal_only = sum(withinwt[as.numeric(Q97) == "1" ]),
+            some_primary = sum(withinwt[as.numeric(Q97) == "2"]),
+            primary_completed = sum(withinwt[as.numeric(Q97) == "3"]),
+            some_secondary = sum(withinwt[as.numeric(Q97) == "4"]),
+            secondary_completed = sum(withinwt[as.numeric(Q97) == "5"]),
+            post_secondary = sum(withinwt[as.numeric(Q97) == "6"]),
+            some_university = sum(withinwt[as.numeric(Q97) == "7"]),
+            university_completed = sum(withinwt[as.numeric(Q97) == "8"]),
+            post_graduate = sum(withinwt[as.numeric(Q97) == "9"]),
+            unknow = sum(withinwt[as.numeric(Q97) == "99"]) + 
+                     sum(withinwt[as.numeric(Q97) == "-1"]) +
+                     sum(withinwt[as.numeric(Q97) == "98"])
+            ) %>%
+  melt(id.vars='Q81E') %>%
+  group_by(Q81E) %>% 
+    mutate(ratio = value/sum(value),
+           ratio = scales::percent(ratio, accuracy = 1),
+           ratio = ifelse(ratio == "0%", NA, ratio )) %>%
+  ggplot(aes(x = as.factor(Q81E), y = value, fill = variable)) + 
+      geom_col(stat='identity', position="fill") +
+      geom_text(aes(label=ratio),size=2, position=position_fill(vjust=0.5)) +
+      scale_fill_manual(values = color) +
+      scale_x_discrete(labels = cname)+
+      scale_y_continuous(labels = scales::comma, expand = c(0,0,0.05,0))+
+      labs(title = "China's assistance does a good job at meeting country's needs \n(Education)",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+
+#### Age
+```{r Plot 7.3, echo=FALSE, message=FALSE, warning=FALSE}
+cname <- c("Very bad", "Somewhat bad","Neutral", "Somewhat good", "Very good","No \ndevelopment \nassistance","Don't know")
+
+p <- q81e %>%
+  group_by(Q81E) %>%
+  summarise("20-29" = sum(withinwt[as.numeric(Q113) >= "20" & as.numeric(Q113) <= "29"]),
+            "30-39" = sum(withinwt[as.numeric(Q113) >= "30" & as.numeric(Q113) <= "39"]),
+            "40-49" = sum(withinwt[as.numeric(Q113) >= "40" & as.numeric(Q113) <= "49"]),
+            "50-59" = sum(withinwt[as.numeric(Q113) >= "50" & as.numeric(Q113) <= "59"])) %>%
+  melt(id.vars='Q81E') %>%
+  group_by(Q81E) %>% 
+    mutate(ratio = value/sum(value),
+           ratio = scales::percent(ratio, accuracy = 1),
+           ratio = ifelse(ratio == "0%", NA, ratio )) %>%
+  ggplot(aes(x = as.factor(Q81E), y = value, fill = variable)) + 
+      geom_col(stat='identity', position="fill") +
+      geom_text(aes(label=ratio),size=2, position=position_fill(vjust=0.5)) +
+      scale_fill_manual(values=wes_palette(n=4, name="Darjeeling1")) +
+      scale_x_discrete(labels = cname)+
+      scale_y_continuous(labels = scales::comma, expand = c(0,0,0.05,0))+
+      labs(title = "China's assistance does a good job at meeting country's needs \n(Age)",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+## Rawdata Hangwei  {.tabset}
+```{r include=FALSE}
+zambia <- read_sav("zam_r6_data_eng.sav", encoding = "latin1")
+rawdata <- read.csv("zambia rawdata hangwei.csv")
+rawdata = rawdata[-1,]
+sub <- subset(rawdata, select=c(2:4, 6, 163:182, 243:257))
+```
+
+### Ownership
+```{r Plot 8A, echo=FALSE, message=FALSE, warning=FALSE}
+p <- sub %>% 
+  group_by(SOE) %>% 
+  count() %>% 
+  ungroup() %>% 
+  mutate(perc = `n` / sum(`n`)) %>% 
+  arrange(perc) %>%
+  mutate(labels = scales::percent(perc)) %>% 
+  ggplot(aes(x = "", y = perc, fill = SOE)) + 
+      geom_col() +
+      ggtitle("Ownership")+
+      coord_polar(theta = "y", start=0)+
+      geom_text(aes(label = labels),
+                position = position_stack(vjust = 0.5)) +
+  theme_void()+
+  scale_fill_manual(values=c("cadetblue3", "azure2"),
+                    name ="")
+p
+```
+
+### q31a
+In 2015, how many employees do you have? - (Part-time) 
+```{r include=FALSE}
+h31a <- subset(sub, select = c(1:8))
+```
+
+```{r Plot 8, echo=FALSE, message=FALSE, warning=FALSE}
+p <- h31a %>%
+  subset(select=c(1,5:7)) %>%
+  melt(id.vars='id') %>%
+  group_by(variable) %>%
+  summarise(number = sum(as.numeric(value))) %>%
+  filter(number > 0) %>%
+  ggplot(aes(x = as.factor(variable), y = number)) + 
+      geom_col(fill="blue", color="black") +
+      scale_x_discrete(labels = c("Local African", "Chinese")) +
+      scale_y_continuous(labels = scales::comma, expand = c(0,0,0,50))+
+      labs(title = "How many employees do you have?(Part-time)",
+           y = "Observations",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+#### Classified Industry
+```{r Plot 8.1, echo=FALSE, message=FALSE, warning=FALSE}
+p <- h31a %>%
+  subset(select=c(2,5:7)) %>%
+  melt(id.vars='Primaryindustry') %>%
+  group_by(Primaryindustry, variable) %>%
+  summarise(number = sum(as.numeric(value))) %>%
+  group_by(variable) %>% 
+    mutate(ratio = number/sum(number),
+           ratio = scales::percent(ratio, accuracy = 0.1),
+           ratio = ifelse(ratio == "0%", NA, ratio )) %>%
+  filter(number > 0) %>%
+  ggplot(aes(x = as.factor(variable), y = number, fill = Primaryindustry)) + 
+      geom_col(stat='identity', position="fill") +
+      geom_text(aes(label=ratio),size=2, position=position_fill(vjust=0.5)) +
+      scale_x_discrete(labels = c("Local African", "Chinese")) +
+      scale_y_continuous(labels = scales::comma, expand = c(0,0,0.05,0))+
+      scale_fill_manual(values=wes_palette(n=5, name="Darjeeling1")) +
+      labs(title = "How many employees do you have?(Part-time) - Classified Industry",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+#### Ownership
+```{r Plot 8.2, echo=FALSE, message=FALSE, warning=FALSE}
+p <- h31a %>%
+  subset(select=c(3,5:7)) %>%
+  melt(id.vars='SOE') %>%
+  group_by(SOE, variable) %>%
+  summarise(number = sum(as.numeric(value))) %>%
+  group_by(variable) %>% 
+    mutate(ratio = number/sum(number),
+           ratio = scales::percent(ratio, accuracy = 0.1),
+           ratio = ifelse(ratio == "0%", NA, ratio )) %>%
+  filter(number > 0) %>%
+  ggplot(aes(x = as.factor(variable), y = number, fill = SOE)) + 
+      geom_col(stat='identity', position="fill") +
+      geom_text(aes(label=ratio),size=2, position=position_fill(vjust=0.5)) +
+      scale_x_discrete(labels = c("Local African", "Chinese")) +
+      scale_y_continuous(labels = scales::comma, expand = c(0,0,0.05,0))+
+      labs(title = "How many employees do you have?(Part-time) - Ownership",
+           y = "Density",
+           x= "",
+           fill = "Ownership") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+#### Industry Investment
+```{r Plot 8.3, echo=FALSE, message=FALSE, warning=FALSE}
+p <- h31a %>%
+  subset(select=c(4,5:7)) %>%
+  melt(id.vars='IndustryInvestment') %>%
+  na_if("") %>%
+  mutate(IndustryInvestment = ifelse(is.na(IndustryInvestment), 0, IndustryInvestment),
+         IndustryInvestment = as.numeric(gsub("," ,"",IndustryInvestment))) %>%
+  group_by(variable) %>%
+  summarise("0-25,000" = sum(as.numeric(value)[IndustryInvestment >= 0 & IndustryInvestment <= 50000]),
+            "25,000-50,000" = sum(as.numeric(value)[IndustryInvestment >50000 & IndustryInvestment <= 100000]),
+            "50,000-500,000" = sum(as.numeric(value)[IndustryInvestment > 100000 & IndustryInvestment <= 500000]),
+            "500,000-2,000,000" = sum(as.numeric(value)[IndustryInvestment > 500000 & IndustryInvestment <= 2000000])) %>%
+  rename(question = variable) %>%
+  melt(id.vars='question') %>%
+  group_by(question) %>% 
+    mutate(ratio = value/sum(value),
+           ratio = scales::percent(ratio, accuracy = 0.1),
+           ratio = ifelse(ratio == "0.0%", NA, ratio )) %>%
+  filter(value > 0) %>%
+  ggplot(aes(x = as.factor(question), y = value, fill = variable)) + 
+      geom_col(stat='identity', position="fill") +
+      geom_text(aes(label=ratio),size=2, position=position_fill(vjust=0.5)) +
+      scale_y_continuous(labels = scales::comma, expand = c(0,0,0.05,0))+
+      scale_x_discrete(labels = c("Local African", "Chinese")) +
+      scale_fill_manual(values=wes_palette(n=2, name="Darjeeling1")) +
+      labs(title = "How many employees do you have?(Part-time) - Industry Investment",
+           y = "Density",
+           x= "",
+           fill = "Industry Investment") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+### q31b
+In 2015, how many employees do you have? - (Full-time) 
+```{r include=FALSE}
+h31b <- subset(sub, select = c(1:4, 9:12))
+```
+
+```{r Plot 9, echo=FALSE, message=FALSE, warning=FALSE}
+p <- h31b %>%
+  subset(select=c(1,5:7)) %>%
+  melt(id.vars='id') %>%
+  group_by(variable) %>%
+  summarise(number = sum(as.numeric(value))) %>%
+  filter(number > 0) %>%
+  ggplot(aes(x = as.factor(variable), y = number)) + 
+      geom_col(fill="blue", color="black") +
+      scale_x_discrete(labels = c("Local African", "Chinese", "Others")) +
+      scale_y_continuous(labels = scales::comma, expand = c(0,0,0,100))+
+      labs(title = "How many employees do you have?(Full-time)",
+           y = "Observations",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+#### Classified Industry
+```{r Plot 9.1, echo=FALSE, message=FALSE, warning=FALSE}
+color <- c( "orange","coral1","#D16103","#00AFBB", "#C3D7A4", "#52854C")
+p <- h31b %>%
+  subset(select=c(2,5:7)) %>%
+  melt(id.vars='Primaryindustry') %>%
+  group_by(Primaryindustry, variable) %>%
+  summarise(number = sum(as.numeric(value))) %>%
+  group_by(variable) %>% 
+    mutate(ratio = number/sum(number),
+           ratio = scales::percent(ratio, accuracy = 0.1),
+           ratio = ifelse(ratio == "0%", NA, ratio )) %>%
+  filter(number > 0) %>%
+  ggplot(aes(x = as.factor(variable), y = number, fill = Primaryindustry)) + 
+      geom_col(stat='identity', position="fill") +
+      geom_text(aes(label=ratio),size=2, position=position_fill(vjust=0.5)) +
+      scale_x_discrete(labels = c("Local African", "Chinese", "Others")) +
+      scale_y_continuous(labels = scales::comma, expand = c(0,0,0.05,0))+
+      scale_fill_manual(values=color) +
+      labs(title = "How many employees do you have?(Full-time) - Classified Industry",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+#### Ownership
+```{r Plot 9.2, echo=FALSE, message=FALSE, warning=FALSE}
+p <- h31b %>%
+  subset(select=c(3,5:7)) %>%
+  melt(id.vars='SOE') %>%
+  group_by(SOE, variable) %>%
+  summarise(number = sum(as.numeric(value))) %>%
+  group_by(variable) %>% 
+    mutate(ratio = number/sum(number),
+           ratio = scales::percent(ratio, accuracy = 0.1),
+           ratio = ifelse(ratio == "0%", NA, ratio )) %>%
+  filter(number > 0) %>%
+  ggplot(aes(x = as.factor(variable), y = number, fill = SOE)) + 
+      geom_col(stat='identity', position="fill") +
+      geom_text(aes(label=ratio),size=2, position=position_fill(vjust=0.5)) +
+      scale_x_discrete(labels = c("Local African", "Chinese", "Others")) +
+      scale_y_continuous(labels = scales::comma, expand = c(0,0,0.05,0))+
+      labs(title = "How many employees do you have?(Full-time) - Ownership",
+           y = "Density",
+           x= "",
+           fill = "Ownership") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+#### Industry Investment
+```{r Plot 9.3, echo=FALSE, message=FALSE, warning=FALSE}
+p <- h31b %>%
+  subset(select=c(4,5:7)) %>%
+  melt(id.vars='IndustryInvestment') %>%
+  na_if("") %>%
+  mutate(IndustryInvestment = ifelse(is.na(IndustryInvestment), 0, IndustryInvestment),
+         IndustryInvestment = as.numeric(gsub("," ,"",IndustryInvestment))) %>%
+  group_by(variable) %>%
+  summarise("0-25,000" = sum(as.numeric(value)[IndustryInvestment >= 0 & IndustryInvestment <= 50000]),
+            "25,000-50,000" = sum(as.numeric(value)[IndustryInvestment >50000 & IndustryInvestment <= 100000]),
+            "50,000-500,000" = sum(as.numeric(value)[IndustryInvestment > 100000 & IndustryInvestment <= 500000]),
+            "500,000-2,000,000" = sum(as.numeric(value)[IndustryInvestment > 500000 & IndustryInvestment <= 2000000]))%>%
+  rename(question = variable) %>%
+  melt(id.vars='question') %>%
+  group_by(question) %>% 
+    mutate(ratio = value/sum(value),
+           ratio = scales::percent(ratio, accuracy = 0.1),
+           ratio = ifelse(ratio == "0.0%", NA, ratio )) %>%
+  filter(value > 0) %>%
+  ggplot(aes(x = as.factor(question), y = value, fill = variable)) + 
+      geom_col(stat='identity', position="fill") +
+      geom_text(aes(label=ratio),size=2, position=position_fill(vjust=0.5)) +
+      scale_y_continuous(labels = scales::comma, expand = c(0,0,0.05,0))+
+      scale_x_discrete(labels = c("Local African", "Chinese", "Others")) +
+      scale_fill_manual(values=wes_palette(n=4, name="Darjeeling1")) +
+      labs(title = "How many employees do you have?(Full-time) - Industry Investment",
+           y = "Density",
+           x= "",
+           fill = "Industry Investment") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+### q31c
+In 2015, how many employees do you have? - (Full-time Management) 
+```{r include=FALSE}
+h31c <- subset(sub, select = c(1:4, 13:16))
+```
+
+```{r Plot 10, echo=FALSE, message=FALSE, warning=FALSE}
+p <- h31c %>%
+  subset(select=c(1,5:7)) %>%
+  melt(id.vars='id') %>%
+  group_by(variable) %>%
+  summarise(number = sum(as.numeric(value))) %>%
+  filter(number > 0) %>%
+  ggplot(aes(x = as.factor(variable), y = number)) + 
+      geom_col(fill="blue", color="black") +
+      scale_x_discrete(labels = c("Local African", "Chinese", "Others")) +
+      scale_y_continuous(labels = scales::comma, expand = c(0,0,0,20))+
+      labs(title = "How many employees do you have?(Full-time Management)",
+           y = "Observations",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+#### Classified Industry
+```{r Plot 10.1, echo=FALSE, message=FALSE, warning=FALSE}
+color <- c( "orange","coral1","#D16103","#00AFBB", "#C3D7A4", "#52854C")
+p <- h31c %>%
+  subset(select=c(2,5:7)) %>%
+  melt(id.vars='Primaryindustry') %>%
+  group_by(Primaryindustry, variable) %>%
+  summarise(number = sum(as.numeric(value))) %>%
+  group_by(variable) %>% 
+    mutate(ratio = number/sum(number),
+           ratio = scales::percent(ratio, accuracy = 0.1),
+           ratio = ifelse(ratio == "0%", NA, ratio )) %>%
+  filter(number > 0) %>%
+  ggplot(aes(x = as.factor(variable), y = number, fill = Primaryindustry)) + 
+      geom_col(stat='identity', position="fill") +
+      geom_text(aes(label=ratio),size=2, position=position_fill(vjust=0.5)) +
+      scale_x_discrete(labels = c("Local African", "Chinese", "Others")) +
+      scale_y_continuous(labels = scales::comma, expand = c(0,0,0.05,0))+
+      scale_fill_manual(values=color) +
+      labs(title = "How many employees do you have?(Full-time Management) - Classified Industry",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+#### Ownership
+```{r Plot 10.2, echo=FALSE, message=FALSE, warning=FALSE}
+p <- h31b %>%
+  subset(select=c(3,5:7)) %>%
+  melt(id.vars='SOE') %>%
+  group_by(SOE, variable) %>%
+  summarise(number = sum(as.numeric(value))) %>%
+  group_by(variable) %>% 
+    mutate(ratio = number/sum(number),
+           ratio = scales::percent(ratio, accuracy = 0.1),
+           ratio = ifelse(ratio == "0%", NA, ratio )) %>%
+  filter(number > 0) %>%
+  ggplot(aes(x = as.factor(variable), y = number, fill = SOE)) + 
+      geom_col(stat='identity', position="fill") +
+      geom_text(aes(label=ratio),size=2, position=position_fill(vjust=0.5)) +
+      scale_x_discrete(labels = c("Local African", "Chinese", "Others")) +
+      scale_y_continuous(labels = scales::comma, expand = c(0,0,0.05,0))+
+      labs(title = "How many employees do you have?(Full-time Management) - Ownership",
+           y = "Density",
+           x= "",
+           fill = "Ownership") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+#### Industry Investment
+```{r Plot 10.3, echo=FALSE, message=FALSE, warning=FALSE}
+p <- h31c %>%
+  subset(select=c(4,5:7)) %>%
+  melt(id.vars='IndustryInvestment') %>%
+  na_if("") %>%
+  mutate(IndustryInvestment = ifelse(is.na(IndustryInvestment), 0, IndustryInvestment),
+         IndustryInvestment = as.numeric(gsub("," ,"",IndustryInvestment))) %>%
+  group_by(variable) %>%
+  summarise("0-25,000" = sum(as.numeric(value)[IndustryInvestment >= 0 & IndustryInvestment <= 50000]),
+            "25,000-50,000" = sum(as.numeric(value)[IndustryInvestment >50000 & IndustryInvestment <= 100000]),
+            "50,000-500,000" = sum(as.numeric(value)[IndustryInvestment > 100000 & IndustryInvestment <= 500000]),
+            "500,000-2,000,000" = sum(as.numeric(value)[IndustryInvestment > 500000 & IndustryInvestment <= 2000000]))%>%
+  rename(question = variable) %>%
+  melt(id.vars='question') %>%
+  group_by(question) %>% 
+    mutate(ratio = value/sum(value),
+           ratio = scales::percent(ratio, accuracy = 0.1),
+           ratio = ifelse(ratio == "0.0%", NA, ratio )) %>%
+  filter(value > 0) %>%
+  ggplot(aes(x = as.factor(question), y = value, fill = variable)) + 
+      geom_col(stat='identity', position="fill") +
+      geom_text(aes(label=ratio),size=2, position=position_fill(vjust=0.5)) +
+      scale_y_continuous(labels = scales::comma, expand = c(0,0,0.05,0))+
+      scale_x_discrete(labels = c("Local African", "Chinese", "Others")) +
+      scale_fill_manual(values=wes_palette(n=4, name="Darjeeling1")) +
+      labs(title = "How many employees do you have?(Full-time Management) - Industry Investment",
+           y = "Density",
+           x= "",
+           fill = "Industry Investment") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+### q32a
+What training programs does the company provide for local employees? (Training period): month
+```{r include=FALSE}
+h32a <- subset(sub, select = c(1:4, 17:20))
+```
+
+```{r Plot 11, echo=FALSE, message=FALSE, warning=FALSE}
+p <- h32a %>%
+  subset(select=c(1,5:8)) %>%
+  melt(id.vars='id') %>%
+  na_if("") %>%
+  na.omit() %>%
+  group_by(variable) %>%
+  summarise(number = sum(as.numeric(value))) %>%
+  filter(number > 0) %>%
+  ggplot(aes(x = as.factor(variable), y = number)) + 
+      geom_col(fill="blue", color="black") +
+      scale_x_discrete(labels = c("Apprentice", "Professional", "Official \nexternal \nprofessional", "Others")) +
+      scale_y_continuous(labels = scales::comma, expand = c(0,0,0,20))+
+      labs(title = "Training for local employees(month)",
+           y = "Observations",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+#### Classified Industry
+```{r Plot 11.1, echo=FALSE, message=FALSE, warning=FALSE}
+color <- c( "orange","coral1","#D16103","#00AFBB", "#C3D7A4", "#52854C")
+p <- h32a %>%
+  subset(select=c(2,5:8)) %>%
+  melt(id.vars='Primaryindustry') %>%
+  na_if("") %>%
+  na.omit() %>%
+  group_by(Primaryindustry, variable) %>%
+  summarise(number = sum(as.numeric(value))) %>%
+  group_by(variable) %>% 
+    mutate(ratio = number/sum(number),
+           ratio = scales::percent(ratio, accuracy = 0.1),
+           ratio = ifelse(ratio == "0%", NA, ratio )) %>%
+  filter(number > 0) %>%
+  ggplot(aes(x = as.factor(variable), y = number, fill = Primaryindustry)) + 
+      geom_col(stat='identity', position="fill") +
+      geom_text(aes(label=ratio),size=2, position=position_fill(vjust=0.5)) +
+      scale_x_discrete(labels = c("Apprentice", "Professional", "Official \nexternal \nprofessional", "Others")) +
+      scale_y_continuous(labels = scales::comma, expand = c(0,0,0.05,0))+
+      scale_fill_manual(values=color) +
+      labs(title = "Training for local employees(month) - Classified Industry",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+#### Ownership
+```{r Plot 11.2, echo=FALSE, message=FALSE, warning=FALSE}
+p <- h32a %>%
+  subset(select=c(3,5:8)) %>%
+  melt(id.vars='SOE') %>%
+  na_if("") %>%
+  na.omit() %>%
+  group_by(SOE, variable) %>%
+  summarise(number = sum(as.numeric(value))) %>%
+  group_by(variable) %>% 
+    mutate(ratio = number/sum(number),
+           ratio = scales::percent(ratio, accuracy = 0.1),
+           ratio = ifelse(ratio == "0%", NA, ratio )) %>%
+  filter(number > 0) %>%
+  ggplot(aes(x = as.factor(variable), y = number, fill = SOE)) + 
+      geom_col(stat='identity', position="fill") +
+      geom_text(aes(label=ratio),size=2, position=position_fill(vjust=0.5)) +
+      scale_x_discrete(labels = c("Apprentice", "Professional", "Official \nexternal \nprofessional", "Others")) +
+      scale_y_continuous(labels = scales::comma, expand = c(0,0,0.05,0))+
+      labs(title = "Training for local employees(month) - Ownership",
+           y = "Density",
+           x= "",
+           fill = "Ownership") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+#### Industry Investment
+```{r Plot 11.3, echo=FALSE, message=FALSE, warning=FALSE}
+p <- h32a %>%
+  subset(select=c(4,5:7)) %>%
+  melt(id.vars='IndustryInvestment') %>%
+  na_if("") %>%
+  na.omit() %>%
+  mutate(IndustryInvestment = ifelse(is.na(IndustryInvestment), 0, IndustryInvestment),
+         IndustryInvestment = as.numeric(gsub("," ,"",IndustryInvestment))) %>%
+  group_by(variable) %>%
+  summarise("0-25,000" = sum(as.numeric(value)[IndustryInvestment >= 0 & IndustryInvestment <= 50000]),
+            "25,000-50,000" = sum(as.numeric(value)[IndustryInvestment >50000 & IndustryInvestment <= 100000]),
+            "50,000-500,000" = sum(as.numeric(value)[IndustryInvestment > 100000 & IndustryInvestment <= 500000]),
+            "500,000-2,000,000" = sum(as.numeric(value)[IndustryInvestment > 500000 & IndustryInvestment <= 2000000]))%>%
+  rename(question = variable) %>%
+  melt(id.vars='question') %>%
+  group_by(question) %>% 
+    mutate(ratio = value/sum(value),
+           ratio = scales::percent(ratio, accuracy = 0.1),
+           ratio = ifelse(ratio == "0.0%", NA, ratio )) %>%
+  filter(value > 0) %>%
+  ggplot(aes(x = as.factor(question), y = value, fill = variable)) + 
+      geom_col(stat='identity', position="fill") +
+      geom_text(aes(label=ratio),size=2, position=position_fill(vjust=0.5)) +
+      scale_y_continuous(labels = scales::comma, expand = c(0,0,0.05,0))+
+      scale_x_discrete(labels = c("Local African", "Chinese", "Others")) +
+      scale_fill_manual(values=wes_palette(n=3, name="Darjeeling1")) +
+      labs(title = "Training for local employees(month) - Industry Investment",
+           y = "Density",
+           x= "",
+           fill = "Industry Investment") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+### q32b
+32.What training programs does the company provide for local employees? (Costs): $
+```{r include=FALSE}
+h32b <- subset(sub, select = c(1:4, 21:24))
+```
+
+```{r Plot 12, echo=FALSE, message=FALSE, warning=FALSE}
+p <- h32b %>%
+  subset(select=c(1,5:8)) %>%
+  melt(id.vars='id') %>%
+  na_if("") %>%
+  na.omit() %>%
+  group_by(variable) %>%
+  summarise(number = sum(as.numeric(value))) %>%
+  filter(number > 0) %>%
+  ggplot(aes(x = as.factor(variable), y = number)) + 
+      geom_col(fill="blue", color="black") +
+      scale_x_discrete(labels = c("Apprentice", "Professional", "Official \nexternal \nprofessional", "Others")) +
+      scale_y_continuous(labels = scales::comma, expand = c(0,0,0,500))+
+      labs(title = "Training for local employees($)",
+           y = "Observations",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+#### Classified Industry
+```{r Plot 12.1, echo=FALSE, message=FALSE, warning=FALSE}
+color <- c( "orange","coral1","#D16103","#00AFBB", "#C3D7A4", "#52854C")
+p <- h32b %>%
+  subset(select=c(2,5:8)) %>%
+  melt(id.vars='Primaryindustry') %>%
+  na_if("") %>%
+  na.omit() %>%
+  group_by(Primaryindustry, variable) %>%
+  summarise(number = sum(as.numeric(value))) %>%
+  group_by(variable) %>% 
+    mutate(ratio = number/sum(number),
+           ratio = scales::percent(ratio, accuracy = 0.1),
+           ratio = ifelse(ratio == "0%", NA, ratio )) %>%
+  filter(number > 0) %>%
+  ggplot(aes(x = as.factor(variable), y = number, fill = Primaryindustry)) + 
+      geom_col(stat='identity', position="fill") +
+      geom_text(aes(label=ratio),size=2, position=position_fill(vjust=0.5)) +
+      scale_x_discrete(labels = c("Apprentice", "Professional", "Official \nexternal \nprofessional", "Others")) +
+      scale_y_continuous(labels = scales::comma, expand = c(0,0,0.05,0))+
+      scale_fill_manual(values=color) +
+      labs(title = "Training for local employees($) - Classified Industry",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+#### Ownership
+```{r Plot 12.2, echo=FALSE, message=FALSE, warning=FALSE}
+p <- h32b %>%
+  subset(select=c(3,5:8)) %>%
+  melt(id.vars='SOE') %>%
+  na_if("") %>%
+  na.omit() %>%
+  group_by(SOE, variable) %>%
+  summarise(number = sum(as.numeric(value))) %>%
+  group_by(variable) %>% 
+    mutate(ratio = number/sum(number),
+           ratio = scales::percent(ratio, accuracy = 0.1),
+           ratio = ifelse(ratio == "0%", NA, ratio )) %>%
+  filter(number > 0) %>%
+  ggplot(aes(x = as.factor(variable), y = number, fill = SOE)) + 
+      geom_col(stat='identity', position="fill") +
+      geom_text(aes(label=ratio),size=2, position=position_fill(vjust=0.5)) +
+      scale_x_discrete(labels = c("Apprentice", "Professional", "Official \nexternal \nprofessional", "Others")) +
+      scale_y_continuous(labels = scales::comma, expand = c(0,0,0.05,0))+
+      labs(title = "Training for local employees($) - Ownership",
+           y = "Density",
+           x= "",
+           fill = "Ownership") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+#### Industry Investment
+```{r Plot 12.3, echo=FALSE, message=FALSE, warning=FALSE}
+p <- h32b %>%
+  subset(select=c(4,5:7)) %>%
+  melt(id.vars='IndustryInvestment') %>%
+  na_if("") %>%
+  na.omit() %>%
+  mutate(IndustryInvestment = ifelse(is.na(IndustryInvestment), 0, IndustryInvestment),
+         IndustryInvestment = as.numeric(gsub("," ,"",IndustryInvestment))) %>%
+  group_by(variable) %>%
+  summarise("0-25,000" = sum(as.numeric(value)[IndustryInvestment >= 0 & IndustryInvestment <= 50000]),
+            "25,000-50,000" = sum(as.numeric(value)[IndustryInvestment >50000 & IndustryInvestment <= 100000]),
+            "50,000-500,000" = sum(as.numeric(value)[IndustryInvestment > 100000 & IndustryInvestment <= 500000]),
+            "500,000-2,000,000" = sum(as.numeric(value)[IndustryInvestment > 500000 & IndustryInvestment <= 2000000]))%>%
+  rename(question = variable) %>%
+  melt(id.vars='question') %>%
+  group_by(question) %>% 
+    mutate(ratio = value/sum(value),
+           ratio = scales::percent(ratio, accuracy = 0.1),
+           ratio = ifelse(ratio == "0.0%", NA, ratio )) %>%
+  filter(value > 0) %>%
+  ggplot(aes(x = as.factor(question), y = value, fill = variable)) + 
+      geom_col(stat='identity', position="fill") +
+      geom_text(aes(label=ratio),size=2, position=position_fill(vjust=0.5)) +
+      scale_y_continuous(labels = scales::comma, expand = c(0,0,0.05,0))+
+      scale_x_discrete(labels = c("Local African", "Chinese", "Others")) +
+      scale_fill_manual(values=wes_palette(n=3, name="Darjeeling1")) +
+      labs(title = "Training for local employees($) - Industry Investment",
+           y = "Density",
+           x= "",
+           fill = "Industry Investment") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+### q42 {.tabset}
+```{r include=FALSE}
+h42 <- subset(sub, select = c(1:4, 25:39))
+```
+
+#### 1
+Please grade on the following conditions - Tax problems
+```{r Plot 13.1, echo=FALSE, message=FALSE, warning=FALSE}
+p <- h42 %>% 
+  group_by(q42_1) %>% 
+  count() %>% 
+  ungroup() %>% 
+  mutate(perc = `n` / sum(`n`)) %>% 
+  arrange(perc) %>%
+  mutate(labels = scales::percent(perc)) %>% 
+  ggplot(aes(x = "", y = perc, fill = q42_1)) + 
+      geom_col() +
+      ggtitle("Grade on the Tax problems") +
+      coord_polar(theta = "y", start=0)+
+      geom_text(aes(label = labels),
+                position = position_stack(vjust = 0.5)) +
+  theme_void()+
+  scale_fill_manual(values=wes_palette(n=4, name="Darjeeling1"),
+                    name = "Difficult Level",
+                    labels = c("Not at all", "Slightly", "Medium", "Serious"))
+p
+```
+
+#### 2
+Please grade on the following conditions - Commercial licenses
+```{r Plot 13.2, echo=FALSE, message=FALSE, warning=FALSE}
+p <- h42 %>% 
+  group_by(q42_2) %>% 
+  count() %>% 
+  ungroup() %>% 
+  mutate(perc = `n` / sum(`n`)) %>% 
+  arrange(perc) %>%
+  mutate(labels = scales::percent(perc)) %>% 
+  ggplot(aes(x = "", y = perc, fill = q42_2)) + 
+      geom_col() +
+      ggtitle("Grade on the Commercial licenses") +
+      coord_polar(theta = "y", start=0)+
+      geom_text(aes(label = labels),
+                position = position_stack(vjust = 0.5)) +
+  theme_void()+
+  scale_fill_manual(values=wes_palette(n=4, name="Darjeeling1"),
+                    name = "Difficult Level",
+                    labels = c("Not at all", "Slightly", "Medium", "Serious"))
+p
+```
+
+#### 3
+Please grade on the following conditions - Unstable political condition
+```{r Plot 13.3, echo=FALSE, message=FALSE, warning=FALSE}
+p <- h42 %>% 
+  group_by(q42_3) %>% 
+  count() %>% 
+  ungroup() %>% 
+  mutate(perc = `n` / sum(`n`)) %>% 
+  arrange(perc) %>%
+  mutate(labels = scales::percent(perc)) %>% 
+  ggplot(aes(x = "", y = perc, fill = q42_3)) + 
+      geom_col() +
+      ggtitle("Grade on the Unstable political condition") +
+      coord_polar(theta = "y", start=0)+
+      geom_text(aes(label = labels),
+                position = position_stack(vjust = 0.5)) +
+  theme_void()+
+  scale_fill_manual(values=wes_palette(n=4, name="Darjeeling1"),
+                    name = "Difficult Level",
+                    labels = c("Not at all", "Slightly", "Medium", "Serious"))
+p
+```
+
+#### 4
+Please grade on the following conditions - Corruption
+```{r Plot 13.4, echo=FALSE, message=FALSE, warning=FALSE}
+p <- h42 %>% 
+  group_by(q42_4) %>% 
+  count() %>% 
+  ungroup() %>% 
+  mutate(perc = `n` / sum(`n`)) %>% 
+  arrange(perc) %>%
+  mutate(labels = scales::percent(perc)) %>% 
+  ggplot(aes(x = "", y = perc, fill = q42_4)) + 
+      geom_col() +
+      ggtitle("Grade on the Corruption") +
+      coord_polar(theta = "y", start=0)+
+      geom_text(aes(label = labels),
+                position = position_stack(vjust = 0.5)) +
+  theme_void()+
+  scale_fill_manual(values=wes_palette(n=4, name="Darjeeling1"),
+                    name = "Difficult Level",
+                    labels = c("Not at all", "Slightly", "Medium", "Serious"))
+p
+```
+
+#### 5
+Please grade on the following conditions - Financing measures
+```{r Plot 13.5, echo=FALSE, message=FALSE, warning=FALSE}
+p <- h42 %>% 
+  group_by(q42_5) %>% 
+  count() %>% 
+  ungroup() %>% 
+  mutate(perc = `n` / sum(`n`)) %>% 
+  arrange(perc) %>%
+  mutate(labels = scales::percent(perc)) %>% 
+  ggplot(aes(x = "", y = perc, fill = q42_5)) + 
+      geom_col() +
+      ggtitle("Grade on the Financing measures") +
+      coord_polar(theta = "y", start=0)+
+      geom_text(aes(label = labels),
+                position = position_stack(vjust = 0.5)) +
+  theme_void()+
+  scale_fill_manual(values=wes_palette(n=4, name="Darjeeling1"),
+                    name = "Difficult Level",
+                    labels = c("Not at all", "Slightly", "Medium", "Serious"))
+p
+```
+
+#### 6
+Please grade on the following conditions - Social security and safety
+```{r Plot 13.6, echo=FALSE, message=FALSE, warning=FALSE}
+p <- h42 %>% 
+  group_by(q42_6) %>% 
+  count() %>% 
+  ungroup() %>% 
+  mutate(perc = `n` / sum(`n`)) %>% 
+  arrange(perc) %>%
+  mutate(labels = scales::percent(perc)) %>% 
+  ggplot(aes(x = "", y = perc, fill = q42_6)) + 
+      geom_col() +
+      ggtitle("Grade on the Social security and safety") +
+      coord_polar(theta = "y", start=0)+
+      geom_text(aes(label = labels),
+                position = position_stack(vjust = 0.5)) +
+  theme_void()+
+  scale_fill_manual(values=wes_palette(n=4, name="Darjeeling1"),
+                    name = "Difficult Level",
+                    labels = c("Not at all", "Slightly", "Medium", "Serious"))
+p
+```
+
+#### 7
+Please grade on the following conditions - Custom and trade constraint
+```{r Plot 13.7, echo=FALSE, message=FALSE, warning=FALSE}
+p <- h42 %>% 
+  group_by(q42_7) %>% 
+  count() %>% 
+  ungroup() %>% 
+  mutate(perc = `n` / sum(`n`)) %>% 
+  arrange(perc) %>%
+  mutate(labels = scales::percent(perc)) %>% 
+  ggplot(aes(x = "", y = perc, fill = q42_7)) + 
+      geom_col() +
+      ggtitle("Grade on the Custom and trade constraint") +
+      coord_polar(theta = "y", start=0)+
+      geom_text(aes(label = labels),
+                position = position_stack(vjust = 0.5)) +
+  theme_void()+
+  scale_fill_manual(values=wes_palette(n=4, name="Darjeeling1"),
+                    name = "Difficult Level",
+                    labels = c("Not at all", "Slightly", "Medium", "Serious"))
+p
+```
+
+#### 8
+Please grade on the following conditions - Electricity
+```{r Plot 13.8, echo=FALSE, message=FALSE, warning=FALSE}
+p <- h42 %>% 
+  group_by(q42_8) %>% 
+  count() %>% 
+  ungroup() %>% 
+  mutate(perc = `n` / sum(`n`)) %>% 
+  arrange(perc) %>%
+  mutate(labels = scales::percent(perc)) %>% 
+  ggplot(aes(x = "", y = perc, fill = q42_8)) + 
+      geom_col() +
+      ggtitle("Grade on the Electricity") +
+      coord_polar(theta = "y", start=0)+
+      geom_text(aes(label = labels),
+                position = position_stack(vjust = 0.5)) +
+  theme_void()+
+  scale_fill_manual(values=wes_palette(n=4, name="Darjeeling1"),
+                    name = "Difficult Level",
+                    labels = c("Not at all", "Slightly", "Medium", "Serious"))
+p
+```
+
+#### 9. Lack in proficient labor force
+Please grade on the following conditions - Lack in proficient labor force
+```{r Plot 13.9, echo=FALSE, message=FALSE, warning=FALSE}
+p <- h42 %>% 
+  group_by(q42_9) %>% 
+  count() %>% 
+  ungroup() %>% 
+  mutate(perc = `n` / sum(`n`)) %>% 
+  arrange(perc) %>%
+  mutate(labels = scales::percent(perc)) %>% 
+  ggplot(aes(x = "", y = perc, fill = q42_9)) + 
+      geom_col() +
+      ggtitle("Grade on the Lack in proficient labor force") +
+      coord_polar(theta = "y", start=0)+
+      geom_text(aes(label = labels),
+                position = position_stack(vjust = 0.5)) +
+  theme_void()+
+  scale_fill_manual(values=wes_palette(n=4, name="Darjeeling1"),
+                    name = "Difficult Level",
+                    labels = c("Not at all", "Slightly", "Medium", "Serious"))
+p
+```
+
+##### Classified Industry
+```{r Plot 13.9A, echo=FALSE, message=FALSE, warning=FALSE}
+color <- c( "orange","coral1","#D16103","#00AFBB", "#C3D7A4", "#52854C")
+p <- h42 %>%
+  subset(select=c(2,13)) %>%
+  group_by(Primaryindustry, q42_9) %>%
+  count(q42_9) %>%
+  group_by(q42_9) %>%
+  mutate(ratio = n/sum(n),
+           ratio = scales::percent(ratio, accuracy = 0.1),
+           ratio = ifelse(ratio == "0%", NA, ratio )) %>%
+  ggplot(aes(x = as.factor(q42_9), y = n, fill = Primaryindustry)) + 
+      geom_col(stat='identity', position="fill") +
+      geom_text(aes(label=ratio),size=2, position=position_fill(vjust=0.5)) +
+      scale_x_discrete(labels = c("Not Difficult", "Slightly Difficult", 
+                                  "Medium Level", "Serious")) +
+      scale_y_continuous(labels = scales::comma, expand = c(0,0,0.05,0))+
+      scale_fill_manual(values=color) +
+      labs(title = "Grade on the Lack in proficient labor force - Classified Industry",
+           y = "Density",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+##### Ownership
+```{r Plot 13.9B, echo=FALSE, message=FALSE, warning=FALSE}
+p <- h42 %>%
+  subset(select=c(3,13)) %>%
+  group_by(SOE, q42_9) %>%
+  count(q42_9) %>%
+  group_by(q42_9) %>%
+    mutate(ratio = n/sum(n),
+           ratio = scales::percent(ratio, accuracy = 0.1),
+           ratio = ifelse(ratio == "0%", NA, ratio )) %>%
+  ggplot(aes(x = as.factor(q42_9), y = n, fill = SOE)) + 
+      geom_col(stat='identity', position="fill") +
+      geom_text(aes(label=ratio),size=2, position=position_fill(vjust=0.5)) +
+      scale_x_discrete(labels = c("Not Difficult", "Slightly Difficult", 
+                                  "Medium Level", "Serious")) +
+      scale_y_continuous(labels = scales::comma, expand = c(0,0,0.05,0))+
+      labs(title = "Grade on the Lack in proficient labor force - Ownership",
+           y = "Density",
+           x= "",
+           fill = "Ownership") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+##### Industry Investment
+```{r Plot 13.9C, echo=FALSE, message=FALSE, warning=FALSE}
+p <- h42 %>%
+  subset(select=c(4,13)) %>%
+  na_if("") %>%
+  mutate(IndustryInvestment = ifelse(is.na(IndustryInvestment), 0, IndustryInvestment),
+         IndustryInvestment = as.numeric(gsub("," ,"",IndustryInvestment))) %>%
+  group_by(q42_9) %>%
+  summarise("0-25,000" = length(q42_9[IndustryInvestment >= 0 & IndustryInvestment <= 50000]),
+            "25,000-50,000" = length(q42_9[IndustryInvestment >50000 & IndustryInvestment <= 100000]),
+            "50,000-500,000" = length(q42_9[IndustryInvestment > 100000 & IndustryInvestment <= 500000]),
+            "500,000-2,000,000" = length(q42_9[IndustryInvestment > 500000 & IndustryInvestment <= 2000000]))%>%
+  melt(id.vars='q42_9') %>%
+  group_by(q42_9) %>% 
+    mutate(ratio = value/sum(value),
+           ratio = scales::percent(ratio, accuracy = 0.1),
+           ratio = ifelse(ratio == "0.0%", NA, ratio )) %>%
+  filter(value > 0) %>%
+  ggplot(aes(x = as.factor(q42_9), y = value, fill = variable)) + 
+      geom_col(stat='identity', position="fill") +
+      geom_text(aes(label=ratio),size=2, position=position_fill(vjust=0.5)) +
+      scale_y_continuous(labels = scales::comma, expand = c(0,0,0.05,0))+
+      scale_x_discrete(labels = c("Not Difficult", "Slightly Difficult", 
+                                  "Medium Level", "Serious")) +
+      scale_fill_manual(values=wes_palette(n=4, name="Darjeeling1")) +
+      labs(title = "Grade on the Lack in proficient labor force - Industry Investment",
+           y = "Density",
+           x= "",
+           fill = "Industry Investment") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+#### 10
+Please grade on the following conditions - Limitations on law and regulations
+```{r Plot 13.10, echo=FALSE, message=FALSE, warning=FALSE}
+p <- h42 %>% 
+  group_by(q42_10) %>% 
+  na_if("") %>% 
+  na.omit() %>% 
+  count() %>% 
+  ungroup() %>% 
+  mutate(perc = `n` / sum(`n`)) %>% 
+  arrange(perc) %>%
+  mutate(labels = scales::percent(perc)) %>% 
+  ggplot(aes(x = "", y = perc, fill = q42_10)) + 
+      geom_col() +
+      ggtitle("Grade on the Limitations on law and regulations") +
+      coord_polar(theta = "y", start=0)+
+      geom_text(aes(label = labels),
+                position = position_stack(vjust = 0.5)) +
+  theme_void()+
+  scale_fill_manual(values=wes_palette(n=4, name="Darjeeling1"),
+                    name = "Difficult Level",
+                    labels = c("Not at all", "Slightly", "Medium", "Serious"))
+p
+```
+
+#### 11
+Please grade on the following conditions - Language barrier
+```{r Plot 13.11, echo=FALSE, message=FALSE, warning=FALSE}
+p <- h42 %>% 
+  group_by(q42_11) %>% 
+  na_if("") %>% 
+  na.omit() %>% 
+  count() %>% 
+  ungroup() %>% 
+  mutate(perc = `n` / sum(`n`)) %>% 
+  arrange(perc) %>%
+  mutate(labels = scales::percent(perc)) %>% 
+  ggplot(aes(x = "", y = perc, fill = q42_11)) + 
+      geom_col() +
+      ggtitle("Grade on the Language barrier") +
+      coord_polar(theta = "y", start=0)+
+      geom_text(aes(label = labels),
+                position = position_stack(vjust = 0.5)) +
+  theme_void()+
+  scale_fill_manual(values=wes_palette(n=4, name="Darjeeling1"),
+                    name = "Difficult Level",
+                    labels = c("Not at all", "Slightly", "Medium", "Serious"))
+p
+```
+
+#### 12
+Please grade on the following conditions - Cultural shock and creditability
+```{r Plot 13.12, echo=FALSE, message=FALSE, warning=FALSE}
+p <- h42 %>% 
+  group_by(q42_12) %>% 
+  na_if("") %>% 
+  na.omit() %>% 
+  count() %>% 
+  ungroup() %>% 
+  mutate(perc = `n` / sum(`n`)) %>% 
+  arrange(perc) %>%
+  mutate(labels = scales::percent(perc)) %>% 
+  ggplot(aes(x = "", y = perc, fill = q42_12)) + 
+      geom_col() +
+      ggtitle("Grade on the Cultural shock and creditability") +
+      coord_polar(theta = "y", start=0)+
+      geom_text(aes(label = labels),
+                position = position_stack(vjust = 0.5)) +
+  theme_void()+
+  scale_fill_manual(values=wes_palette(n=4, name="Darjeeling1"),
+                    name = "Difficult Level",
+                    labels = c("Not at all", "Slightly", "Medium", "Serious"))
+p
+```
+
+#### 13
+Please grade on the following conditions - Illegal competition
+```{r Plot 13.13, echo=FALSE, message=FALSE, warning=FALSE}
+p <- h42 %>% 
+  group_by(q42_13) %>% 
+  na_if("") %>% 
+  na.omit() %>% 
+  count() %>% 
+  ungroup() %>% 
+  mutate(perc = `n` / sum(`n`)) %>% 
+  arrange(perc) %>%
+  mutate(labels = scales::percent(perc)) %>% 
+  ggplot(aes(x = "", y = perc, fill = q42_13)) + 
+      geom_col() +
+      ggtitle("Grade on the Illegal competition") +
+      coord_polar(theta = "y", start=0)+
+      geom_text(aes(label = labels),
+                position = position_stack(vjust = 0.5)) +
+  theme_void()+
+  scale_fill_manual(values=wes_palette(n=4, name="Darjeeling1"),
+                    name = "Difficult Level",
+                    labels = c("Not at all", "Slightly", "Medium", "Serious"))
+p
+```
+
+#### 14
+Please grade on the following conditions - Transportation
+```{r Plot 13.14, echo=FALSE, message=FALSE, warning=FALSE}
+p <- h42 %>% 
+  group_by(q42_14) %>% 
+  na_if("") %>% 
+  na.omit() %>% 
+  count() %>% 
+  ungroup() %>% 
+  mutate(perc = `n` / sum(`n`)) %>% 
+  arrange(perc) %>%
+  mutate(labels = scales::percent(perc)) %>% 
+  ggplot(aes(x = "", y = perc, fill = q42_14)) + 
+      geom_col() +
+      ggtitle("Grade on the Transportation") +
+      coord_polar(theta = "y", start=0)+
+      geom_text(aes(label = labels),
+                position = position_stack(vjust = 0.5)) +
+  theme_void()+
+  scale_fill_manual(values=wes_palette(n=4, name="Darjeeling1"),
+                    name = "Difficult Level",
+                    labels = c("Not at all", "Slightly", "Medium", "Serious"))
+p
+```
+
+#### 15
+Please grade on the following conditions - Land acquisition
+```{r Plot 13.15, echo=FALSE, message=FALSE, warning=FALSE}
+p <- h42 %>% 
+  group_by(q42_15) %>% 
+  na_if("") %>% 
+  na.omit() %>% 
+  count() %>% 
+  ungroup() %>% 
+  mutate(perc = `n` / sum(`n`)) %>% 
+  arrange(perc) %>%
+  mutate(labels = scales::percent(perc)) %>% 
+  ggplot(aes(x = "", y = perc, fill = q42_15)) + 
+      geom_col() +
+      ggtitle("Grade on the Land acquisition") +
+      coord_polar(theta = "y", start=0)+
+      geom_text(aes(label = labels),
+                position = position_stack(vjust = 0.5)) +
+  theme_void()+
+  scale_fill_manual(values=wes_palette(n=4, name="Darjeeling1"),
+                    name = "Difficult Level",
+                    labels = c("Not at all", "Slightly", "Medium", "Serious"))
+p
+```
+
