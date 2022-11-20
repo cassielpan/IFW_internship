@@ -1,0 +1,151 @@
+---
+title: "lesotho"
+author: "Zixin"
+date: "2022-09-06"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+if(!require("haven")) {install.packages("haven"); library("haven")}
+if(!require("ggplot2")) {install.packages("ggplot2"); library("ggplot2")}
+if(!require("dplyr")) {install.packages("dplyr"); library("dplyr")}
+if(!require("readxl")) {install.packages("readxl"); library("readxl")}
+if(!require("tidyr")) {install.packages("tidyr"); library("tidyr")}
+```
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+diplomats <- read_excel("diplomats.xlsx")
+diplomats <- diplomats %>%
+  filter(year >= 2001 & year  <= 2015)
+projects <- read.csv("data/AidDataCore_ResearchRelease_Level1_v3.1/AidDataCoreThin_ResearchRelease_Level1_v3.1.csv")
+projects_end <- projects %>%
+  filter(recipient %in% c("Lesotho"),
+         year >= 2001 & year  <= 2015)
+finance_global <- read.csv("data/AidDatas_Global_Chinese_Development_Finance_Dataset_Version_2_0/global_finance.csv")
+finance_global <- finance_global %>%
+  filter(Recipient%in% c("Lesotho"),
+         Commitment.Year >= 2001 & Commitment.Year  <= 2015)
+military <- read.csv("data/AidDatas_Global_Chinese_Development_Finance_Dataset_Version_2_0/military.csv")
+military <- military %>%
+  filter(Recipient %in% c("Lesotho"),
+         Commitment.Year >= 2001 & Commitment.Year  <= 2015)
+world_bank <- read.csv("data/WorldBank_GeocodedResearchRelease_Level1_v1.4.2/data/projects_ancillary.csv")
+world_bank <- world_bank %>%
+  separate(APPROVAL.DATE, into = c("day", "month", "year"), sep = "-")  %>%
+  filter(COUNTRY %in% c("Lesotho"),
+         year >= 2001 & year  <= 2015)
+```
+
+All of these statistics are only from Lesotho.
+
+## The number of Visting over time between Lesotho and China
+```{r Plot 1, echo=FALSE, message=FALSE, warning=FALSE}
+p <- diplomats %>%
+  group_by(year) %>%
+  tally() %>%
+  add_row(year = c(2006, 2008, 2012), n = c(0,0,0)) %>%
+  ggplot(aes(x = as.factor(year), y = as.numeric(n), group=1)) + 
+      geom_point() +
+      geom_line() +  
+      scale_y_continuous(limits = c(0,7),breaks=seq(0,7, by = 1), expand = c(0,0,0,0))+
+      labs(title = "Visting over Years between Lesotho and China",
+           y = "The Number of Visting",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.text.x = element_text(angle = 45, hjust=1),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+## Aid Data Core: Projects
+```{r Plot 2, echo=FALSE, message=FALSE, warning=FALSE}
+colors = c("Number of Projects" = "red", "Amount USD: million" = "blue")
+p <- projects_end %>%
+  group_by(year) %>%
+  mutate(n = length(year),
+         money = sum(commitment_amount_usd_constant)/1000000) %>%
+  ggplot() + 
+      geom_point(aes(x = as.numeric(year), y = n, group=1, color = "Number of Projects")) +
+      geom_line(aes(x = as.numeric(year), y = n, group=1, color = "Number of Projects")) +  
+      geom_point(aes(x = as.numeric(year), y = money, group=1, color = "Amount USD: million")) +
+      geom_line(aes(x = as.numeric(year), y = money, group=1, color = "Amount USD: million")) +  
+      scale_y_continuous(name = "",
+        limits = c(0,500),breaks=seq(0,500, by = 50), expand = c(0,0,0,0))+
+      scale_x_continuous(limits = c(2001,2015),breaks=seq(2001,2015, by = 1)) +
+      scale_color_manual(values = colors, name = "") +
+      labs(title = "Aid Core Data: Projects over Years", 
+           x = "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.text.x = element_text(angle = 45, hjust=1),
+            axis.line = element_line(colour = "gray"),
+            legend.position = "bottom")
+p
+```
+
+## Aid Data China:Finance Development  {.tabset}
+### Global Chinese Finance
+```{r Plot 3, echo=FALSE, message=FALSE, warning=FALSE}
+p <- finance_global %>%
+  group_by(Commitment.Year) %>%
+  tally() %>%
+  ggplot(aes(x = as.factor(Commitment.Year), y = n, group=1)) + 
+       geom_point() +
+      geom_line() + 
+      scale_y_continuous(limits = c(0,25),breaks=seq(0,25, by = 5), expand = c(0,0,0,0))+
+      labs(title = "Aid Data: Global Chinese Finance over Years",
+           y = "The Number of Finance Aid",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.text.x = element_text(angle = 45, hjust=1),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+### Military
+```{r Plot 4, echo=FALSE, message=FALSE, warning=FALSE}
+p <- military %>%
+  group_by(Commitment.Year) %>%
+  tally() %>%
+  ggplot(aes(x = as.factor(Commitment.Year), y = n, group=1)) + 
+      geom_point() +
+      geom_line() + 
+      scale_y_continuous(limits = c(0,2),breaks=seq(0,2, by = 1), expand = c(0,0,0,0))+
+      labs(title = "Aid Data: Military over Years",
+           y = "The Number of Military Aid",
+           x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.text.x = element_text(angle = 45, hjust=1),
+            axis.line = element_line(colour = "gray"))
+p
+```
+
+## Aid data: World Bank
+```{r Plot 5, echo=FALSE, message=FALSE, warning=FALSE}
+p <- world_bank %>%
+  group_by(year) %>%
+  tally() %>%
+  add_row(year = c("2002", "2012"), n = c(0,0)) %>%
+  ggplot(aes(x = as.numeric(year), y = n, group = 1)) + 
+      geom_point() +
+      geom_line() + 
+      scale_y_continuous(limits = c(0,4),breaks=seq(0,4, by = 1), expand = c(0,0,0,0))+
+      scale_x_continuous(limits = c(2001,2015),breaks=seq(2001,2015, by = 1)) +
+      labs(title = "Aid Data: World Bank Projects",
+           y = "The Number of Projects",
+            x= "") + 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.text.x = element_text(angle = 45, hjust=1),
+            axis.line = element_line(colour = "gray"))
+p
+```
