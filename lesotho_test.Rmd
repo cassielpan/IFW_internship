@@ -1,0 +1,155 @@
+---
+title: "lesotho_test"
+author: "Zixin"
+date: "2022-11-09"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+if(!require("rgdal")) {install.packages("rgdal"); library("rgdal")}
+if(!require("maptools")) {install.packages("maptools"); library("maptools")}
+if(!require("sf")) {install.packages("sf"); library("sf")}
+if(!require("dplyr")) {install.packages("dplyr"); library("dplyr")}
+if(!require("tidyr")) {install.packages("tidyr"); library("tidyr")}
+if(!require("broom")) {install.packages("broom"); library("broom")}
+if(!require("readxl")) {install.packages("readxl"); library("readxl")}
+if(!require("haven")) {install.packages("haven"); library("haven")}
+if(!require("lfe")) {install.packages("lfe"); library("lfe")}
+if(!require("lmtest")) {install.packages("lmtest"); library("lmtest")}
+if(!require("sandwich")) {install.packages("sandwich"); library("sandwich")}
+if(!require("stargazer")) {install.packages("stargazer"); library("stargazer")}
+```
+
+```{r message=FALSE, warning=FALSE}
+#import excel sheet
+diplomat <- read_xlsx("diplomats.xlsx")
+diplomat_region <- diplomat %>%
+  select(c(1,4,5,9:11)) %>%
+  drop_na(region)
+
+#merge aiddata with amount
+lesotho_aiddata <- read_xlsx("lesotho_aiddata.xlsx")
+aiddata_amount <- read_xlsx("aiddata_amount.xlsx") %>%
+  select(c("project_id", "usd_current"))
+
+lesotho_merge <- left_join(lesotho_aiddata, aiddata_amount, by = "project_id") 
+
+lesotho_aiddata <- lesotho_merge %>%  
+  drop_na(usd_current) %>%
+  select(c(4,5,6,7,13,16,33,58)) 
+names(lesotho_aiddata)[names(lesotho_aiddata) == 'year_'] <- 'year'
+
+lesotho_aiddata_sum <- lesotho_aiddata %>%
+  group_by(year) %>%
+  summarise(usd_amount = sum(usd_current)) 
+
+lesotho_aiddata_flow <- lesotho_aiddata %>%  
+  group_by(year, flow_class) %>%
+  summarise(usd_amount = sum(usd_current))
+
+lesotho_aiddata$usd_amount <- ave(lesotho_aiddata$usd_current, lesotho_aiddata$year, FUN=sum)
+```
+
+```{r message=FALSE, warning=FALSE}
+#import the shapefile
+shape <- readOGR("gadm41_LSO_shp/gadm41_LSO_1.shp", stringsAsFactors=FALSE)
+#par(mar=c(0,0,0,0))
+#plot(shape,  col="skyblue", lwd=0.5 )
+
+#get the longtitude and latitude from shape file
+region.map <- tidy(shape, region = "NAME_1")
+#get the mean of long and lat for each region
+region_code <- region.map %>%
+  group_by(id) %>%
+  summarise(mean_long=mean(long),
+            mean_lat= mean(lat))
+names(region_code)[names(region_code) == 'id'] <- 'region'
+
+#merge lat and long of two datasets
+diplomat_merge_region <- left_join(diplomat_region, region_code, by = "region") %>%
+  filter(year >= 2000 & year <= 2012) %>%
+  mutate(dummy_region = ifelse(region == 'Maseru', 1, 0))
+
+```
+
+```{r message=FALSE, warning=FALSE}
+#Run OLS regression to see the effect of a diplomatic visit on aid allocation to Lesotho 
+#(so the aid allocation variable should be a year after the visits)
+lesotho_aiddata_sum_lag <- lesotho_aiddata_sum
+lesotho_aiddata_sum_lag$year <- lesotho_aiddata_sum_lag$year - 1
+
+diplomat_merge <- left_join(diplomat_merge_region, lesotho_aiddata_sum, by = "year")
+diplomat_merge_lag <- left_join(diplomat_merge_region, lesotho_aiddata_sum_lag, by = "year")
+
+## add 1 to amount incase 0 in some years
+diplomat_merge$usd_amount[is.na(diplomat_merge$usd_amount)] <- 0
+diplomat_merge$usd_amount <- diplomat_merge$usd_amount + 1
+
+## add 1 to amount incase 0 in some years for lag merge file
+diplomat_merge_lag$usd_amount[is.na(diplomat_merge_lag$usd_amount)] <- 0
+diplomat_merge_lag$usd_amount <- diplomat_merge_lag$usd_amount + 1
+
+#create a new dataset to see the situation of aid allocation after a year 
+diplomat_visit <- diplomat_merge_region 
+diplomat_visit$num <- 1
+diplomat_visit <- diplomat_visit %>%
+  group_by(year) %>%
+  summarise(num = sum(num)) 
+
+diplomat_visit_merge <- left_join(lesotho_aiddata_sum_lag, diplomat_visit, by = "year")
+```
+
+
+```{r message=FALSE, warning=FALSE}
+# export dta and csv file
+write.csv(diplomat_merge, "diplomats.csv")
+
+
+
+#write_dta(diplomat_merge, "diplomats.dta")
+
+```
+
+
+```{r message=FALSE, warning=FALSE}
+reg1 <- lm(log(usd_amount) ~ dummy_region, 
+                    data = diplomat_merge)
+cov_1 <- vcovHC(reg1)
+se_1 <- sqrt(diag(cov_1))
+
+reg2 <- lm(log(usd_amount) ~ dummy_region, 
+                    data = diplomat_merge_lag)
+cov_2 <- vcovHC(reg2)
+se_2 <- sqrt(diag(cov_2))
+##fixed effect 
+##reg2 <- felm(log(usd_amount) ~ dummy_region | year | 0 | year, diplomat_merge)
+
+reg3 <- lm(log(usd_amount) ~ num, 
+                    data = diplomat_visit_merge)
+cov_3 <- vcovHC(reg3)
+se_3 <- sqrt(diag(cov_3))
+
+```
+
+```{r  Table 1, results ='asis', message=FALSE, warning=FALSE}
+stargazer(reg1, reg2,reg3, type="html",
+          dep.var.labels = c(""),
+          column.labels = c("Total Flow<br>(log)", "Lag Total Flow<br>(log)","Lag Total Flow<br>(log)"),
+          covariate.labels= c("Birthregion(dummy)", "Number of Visits"),
+          se=list(se_1,se_2, se_3), 
+          column.separate = c(1,1,1),
+          notes.align = "l",
+          notes = "Robust standard errors are in parentheses.")
+```
+
+All of these three are simple OLS models. The first one is the relationship between log(aid) and dummy variable birthregion, both of them are from the same year. The second one the same as the first one, except the time of aid is one year after the time of diplomatic visits. The third one is the relationship bettween the log(aid) and the number of visits, the time of log(aid) is one year after of the year of the visits.
+
+```{r message=FALSE, warning=FALSE}
+#check the country with most number of aid projects
+a <- read_xlsx("a.xlsx")
+a <- a %>% group_by(ADM0_NAME) %>% 
+     summarise(total_count=n(),
+               .groups = 'drop')
+```
+It's United Republic of Tanzania
