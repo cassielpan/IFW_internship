@@ -1,0 +1,489 @@
+# Clean data for DCE estimation in Stata
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+if(!require("dplyr")) {install.packages("dplyr"); library("dplyr")}
+if(!require("mlogit")) {install.packages("mlogit"); library("mlogit")}
+if(!require("reshape2")) {install.packages("reshape2"); library("reshape2")}
+if(!require("stringr")) {install.packages("stringr"); library("stringr")}
+if(!require("survival")) {install.packages("survival"); library("survival")}
+if(!require("tidyr")) {install.packages("tidyr"); library("tidyr")}
+#import data
+survey_data <- read.csv("survey_data.csv")
+
+## Subset choice set responses to merge with other data later on
+# select the choice sets
+choiceset <- subset(survey_data, select = c(9, 61:114))
+
+# drop the first two blank rows
+#choiceset <- choiceset[-(1:2), , drop = FALSE]
+
+# melt all choice sets to one column
+data <- melt(choiceset, id.vars=c("response_id"))
+
+# separate the variable name in order to make all more clear
+data[c('col1', 'job_alternative')] <- str_split_fixed(data$variable, '_', 2)
+data[c('col2', 'col3', "choice_set","col4","col5")] <- str_split_fixed(
+data$col1, '[.]', 5)
+data <- subset(data, select = c("response_id", "choice_set",
+  "job_alternative", "value" ))
+names(data)[names(data) == "value"] <- "ranking"
+
+# make blank to NA
+data_na <- data %>%
+mutate_all(na_if,"")
+
+# delete all NA
+data_no_nan <- na.omit(data_na)
+
+# import choice sets excel
+cs_data <- read.csv("choice_sets.csv")
+names(cs_data)[names(cs_data) == ""] <- "ranking"
+
+#rename first column in place as there is an import error
+colnames(cs_data)[1] = "choice_set"
+
+# merge alternatives with choice set survey
+cs_merge <- merge(data_no_nan, cs_data, by=c("choice_set","job_alternative"))
+
+# construct numerical id for dataset
+id <- subset(cs_merge, select = c("response_id"))
+id <- id %>% distinct()
+id$id <- seq.int(nrow(id))
+cs_merge <- left_join(cs_merge, id, by = "response_id")
+
+# create a time variable in the data to reflect the multiple choices presented
+try <- subset(cs_merge, select = c("id", "response_id", "choice_set"))
+try <- try %>% distinct()
+try <- try %>%
+  group_by(id) %>%
+  mutate(time = row_number())
+cs_merge <- merge(x=cs_merge,y=try, by.x=c("response_id","id", "choice_set"), by.y=c("response_id","id", "choice_set"))
+
+# re-rank the columns
+cs_merge <- cs_merge %>% relocate(ranking, .before = job_alternative) 
+cs_merge <- cs_merge %>% relocate(time, .before = ranking) 
+
+```
+
+```{r}
+# create dataset of characteristics to merge to the choiceset data created above
+#characteristics_data <- subset(survey_data, select = c(9, 41:42, 44:53, 115:137,
+#                                                             139:141, 143:151))
+
+characteristics_data <- subset(survey_data, select = c(1:60, 115:151))
+#-------------------------------------------------------------------------------
+#DATA CLEANING FOR USEFUL CONTROL VARIABLES
+#see number of NAs in a our data
+#colSums(is.na(characteristics_data))
+
+# replace age and salary variables by mean
+characteristics_data$age[is.na(characteristics_data$age)] <- 
+  mean(characteristics_data$age, na.rm = TRUE)
+
+# impute a zero for missing values of the rest of the dataset
+#characteristics_data[is.na(characteristics_data)] = 0
+
+## impute for minimum wished salary
+characteristics_data$minimum_wished_salary[is.na(characteristics_data$
+                                                   minimum_wished_salary)] <- mean(characteristics_data$minimum_wished_salary, na.rm = TRUE)
+
+## impute for wished salary
+characteristics_data$wished_salary[is.na(characteristics_data$wished_salary)] <- mean(characteristics_data$wished_salary, na.rm = TRUE)
+
+# replace all na with blank
+characteristics_data[is.na(characteristics_data)] <- ""
+
+# Check data for NAs again
+#colSums(is.na(characteristics_data))
+#-------------------------------------------------------------------------------
+#--------------------------clean the data---------------------------------------
+## change the type of the column distribution_channel, make all anonymous to 1
+characteristics_data$distribution_channel[characteristics_data$distribution_channel == "anonymous" ] <- 1
+## change the type of the column language, make all EN to 1
+characteristics_data$language[characteristics_data$language == "EN" ] <- 1
+
+## create dummies for study_financing
+study_financing <- subset(characteristics_data, select = c("response_id", "study_financing"))
+study_financing[c('col1', 'col2', "col3", "col4", "col5", "col6")] <- str_split_fixed(study_financing$study_financing, ',', 6)
+study_financing <- study_financing[ -c(2) ]
+### student loan 1
+study_financing$q7_student_loan <- rep(0, nrow(study_financing))
+study_financing$q7_student_loan[study_financing$col1==1] <- 1 
+study_financing$q7_student_loan[study_financing$col2==1] <- 1 
+study_financing$q7_student_loan[study_financing$col3==1] <- 1 
+study_financing$q7_student_loan[study_financing$col4==1] <- 1 
+study_financing$q7_student_loan[study_financing$col5==1] <- 1 
+study_financing$q7_student_loan[study_financing$col6==1] <- 1 
+study_financing$q7_student_loan[study_financing$col7==1] <- 1 
+### merit_scholarship 2
+study_financing$q7_merit_scholarship <- rep(0, nrow(study_financing))
+study_financing$q7_merit_scholarship[study_financing$col1==2] <- 1 
+study_financing$q7_merit_scholarship[study_financing$col2==2] <- 1 
+study_financing$q7_merit_scholarship[study_financing$col3==2] <- 1 
+study_financing$q7_merit_scholarship[study_financing$col4==2] <- 1 
+study_financing$q7_merit_scholarship[study_financing$col5==2] <- 1 
+study_financing$q7_merit_scholarship[study_financing$col6==2] <- 1 
+study_financing$q7_merit_scholarship[study_financing$col7==2] <- 1 
+### family 3
+study_financing$q7_family <- rep(0, nrow(study_financing))
+study_financing$q7_family[study_financing$col1==3] <- 1 
+study_financing$q7_family[study_financing$col2==3] <- 1 
+study_financing$q7_family[study_financing$col3==3] <- 1 
+study_financing$q7_family[study_financing$col4==3] <- 1 
+study_financing$q7_family[study_financing$col5==3] <- 1 
+study_financing$q7_family[study_financing$col6==3] <- 1 
+study_financing$q7_family[study_financing$col7==3] <- 1 
+### employer 4
+study_financing$q7_employer <- rep(0, nrow(study_financing))
+study_financing$q7_employer[study_financing$col1==4] <- 1 
+study_financing$q7_employer[study_financing$col2==4] <- 1 
+study_financing$q7_employer[study_financing$col3==4] <- 1 
+study_financing$q7_employer[study_financing$col4==4] <- 1 
+study_financing$q7_employer[study_financing$col5==4] <- 1 
+study_financing$q7_employer[study_financing$col6==4] <- 1 
+study_financing$q7_employer[study_financing$col7==4] <- 1 
+### savings 5
+study_financing$q7_savings <- rep(0, nrow(study_financing))
+study_financing$q7_savings[study_financing$col1==5] <- 1 
+study_financing$q7_savings[study_financing$col2==5] <- 1 
+study_financing$q7_savings[study_financing$col3==5] <- 1 
+study_financing$q7_savings[study_financing$col4==5] <- 1 
+study_financing$q7_savings[study_financing$col5==5] <- 1 
+study_financing$q7_savings[study_financing$col6==5] <- 1 
+study_financing$q7_savings[study_financing$col7==5] <- 1
+### needs_scholarship 7
+study_financing$q7_needs_scholarship <- rep(0, nrow(study_financing))
+study_financing$q7_needs_scholarship[study_financing$col1==7] <- 1 
+study_financing$q7_needs_scholarship[study_financing$col2==7] <- 1 
+study_financing$q7_needs_scholarship[study_financing$col3==7] <- 1 
+study_financing$q7_needs_scholarship[study_financing$col4==7] <- 1 
+study_financing$q7_needs_scholarship[study_financing$col5==7] <- 1 
+study_financing$q7_needs_scholarship[study_financing$col6==7] <- 1 
+study_financing$q7_needs_scholarship[study_financing$col7==7] <- 1
+### Other 6
+study_financing$q7_other <- rep(0, nrow(study_financing))
+study_financing$q7_other[study_financing$col1==6] <- 1 
+study_financing$q7_other[study_financing$col2==6] <- 1 
+study_financing$q7_other[study_financing$col3==6] <- 1 
+study_financing$q7_other[study_financing$col4==6] <- 1 
+study_financing$q7_other[study_financing$col5==6] <- 1 
+study_financing$q7_other[study_financing$col6==6] <- 1 
+study_financing$q7_other[study_financing$col7==6] <- 1
+study_financing <- study_financing[ -c(2:7) ]
+characteristics_data <- left_join(characteristics_data, study_financing, by=c("response_id"))
+characteristics_data <- characteristics_data %>% relocate(study_financing_other, .after = q7_other)
+
+## create dummies for study_financing_before_graduation
+study_financing_before_graduation <- subset(characteristics_data, select = c("response_id", "study_financing_before_graduation"))
+study_financing_before_graduation[c('col1', 'col2', "col3")] <- str_split_fixed(study_financing_before_graduation$study_financing_before_graduation, ',', 3)
+study_financing_before_graduation <- study_financing_before_graduation[ -c(2) ]
+### student loan 1
+study_financing_before_graduation$q14_student_loan <- rep(0, nrow(study_financing))
+study_financing_before_graduation$q14_student_loan[study_financing_before_graduation$col1==1] <- 1 
+study_financing_before_graduation$q14_student_loan[study_financing_before_graduation$col2==1] <- 1 
+study_financing_before_graduation$q14_student_loan[study_financing_before_graduation$col3==1] <- 1 
+### merit_scholarship 2
+study_financing_before_graduation$q14_merit_scholarship <- rep(0, nrow(study_financing))
+study_financing_before_graduation$q14_merit_scholarship[study_financing_before_graduation$col1==2] <- 1 
+study_financing_before_graduation$q14_merit_scholarship[study_financing_before_graduation$col2==2] <- 1 
+study_financing_before_graduation$q14_merit_scholarship[study_financing_before_graduation$col3==2] <- 1 
+### family 3
+study_financing_before_graduation$q14_family <- rep(0, nrow(study_financing_before_graduation))
+study_financing_before_graduation$q14_family[study_financing_before_graduation$col1==3] <- 1 
+study_financing_before_graduation$q14_family[study_financing_before_graduation$col2==3] <- 1 
+study_financing_before_graduation$q14_family[study_financing_before_graduation$col3==3] <- 1 
+### employer 4
+study_financing_before_graduation$q14_employer <- rep(0, nrow(study_financing_before_graduation))
+study_financing_before_graduation$q14_employer[study_financing_before_graduation$col1==4] <- 1 
+study_financing_before_graduation$q14_employer[study_financing_before_graduation$col2==4] <- 1 
+study_financing_before_graduation$q14_employer[study_financing_before_graduation$col3==4] <- 1 
+### savings 5
+study_financing_before_graduation$q14_savings <- rep(0, nrow(study_financing_before_graduation))
+study_financing_before_graduation$q14_savings[study_financing_before_graduation$col1==5] <- 1 
+study_financing_before_graduation$q14_savings[study_financing_before_graduation$col2==5] <- 1 
+study_financing_before_graduation$q14_savings[study_financing_before_graduation$col3==5] <- 1 
+### needs_scholarship 7
+study_financing_before_graduation$q14_needs_scholarship <- rep(0, nrow(study_financing_before_graduation))
+study_financing_before_graduation$q14_needs_scholarship[study_financing_before_graduation$col1==7] <- 1 
+study_financing_before_graduation$q14_needs_scholarship[study_financing_before_graduation$col2==7] <- 1 
+study_financing_before_graduation$q14_needs_scholarship[study_financing_before_graduation$col3==7] <- 1 
+### Other 6
+study_financing_before_graduation$q14_other <- rep(0, nrow(study_financing_before_graduation))
+study_financing_before_graduation$q14_other[study_financing_before_graduation$col1==6] <- 1 
+study_financing_before_graduation$q14_other[study_financing_before_graduation$col2==6] <- 1 
+study_financing_before_graduation$q14_other[study_financing_before_graduation$col3==6] <- 1 
+study_financing_before_graduation <- study_financing_before_graduation[ -c(2:4) ]
+characteristics_data <- left_join(characteristics_data, study_financing_before_graduation, by=c("response_id"))
+characteristics_data <- characteristics_data %>% relocate(study_financing_before_graduation_other, .after = q14_other)
+
+## separate longest_work_experience_duration
+work <- subset(characteristics_data, select = c("response_id", "longest_work_experience_duration"))
+work$longest_work_experience_duration[work$longest_work_experience_duration == "I am currently working "] <- " " 
+work$longest_work_experience_duration[work$longest_work_experience_duration == "2years"] <- 24
+work$longest_work_experience_duration[work$longest_work_experience_duration == "4\n4"] <- 44 #replace 4 4 with 44
+# split the column
+work[c('col1', 'col2')] <- str_split_fixed(work$longest_work_experience_duration, ' ', 2)
+work <- work[ -c(2,4) ]
+colnames(work)[colnames(work) == "col1"] ="longest_work_experience_dura"
+characteristics_data <- left_join(characteristics_data, work, by=c("response_id"))
+
+## ## separate Second_longest_work_experience_duration
+work_2 <- subset(characteristics_data, select = c("response_id", "Second_longest_work_experience_duration"))
+work_2$Second_longest_work_experience_duration[work_2$Second_longest_work_experience_duration == "Paid internship 3"] <- 3 
+work_2$Second_longest_work_experience_duration[work_2$Second_longest_work_experience_duration == "<1"] <- 0.5 # make <1 to 0.5
+work_2[c('col1', 'col2')] <- str_split_fixed(work_2$Second_longest_work_experience_duration, ' ', 2)
+work_2 <- work_2[ -c(2,4) ]
+colnames(work_2)[colnames(work_2) == "col1"] ="Second_longest_work_experience_dura"
+characteristics_data <- left_join(characteristics_data, work_2, by=c("response_id"))
+
+
+## create dummies for information_source_chinese
+info_chinese <- subset(characteristics_data, select = c("response_id", "information_source_chinese"))
+info_chinese[c('col1', 'col2', "col3", "col4", "col5", "col6")] <- str_split_fixed(info_chinese$information_source_chinese, ',', 6)
+info_chinese <- info_chinese[ -c(2) ]
+### friends 1
+info_chinese$q62_friends <- rep(0, nrow(study_financing))
+info_chinese$q62_friends[info_chinese$col1==1] <- 1 
+info_chinese$q62_friends[info_chinese$col2==1] <- 1 
+info_chinese$q62_friends[info_chinese$col3==1] <- 1 
+info_chinese$q62_friends[info_chinese$col4==1] <- 1 
+info_chinese$q62_friends[info_chinese$col5==1] <- 1 
+info_chinese$q62_friends[info_chinese$col6==1] <- 1 
+### social media 2
+info_chinese$q62_social_media <- rep(0, nrow(study_financing))
+info_chinese$q62_social_media[info_chinese$col1==2] <- 1 
+info_chinese$q62_social_media[info_chinese$col2==2] <- 1 
+info_chinese$q62_social_media[info_chinese$col3==2] <- 1 
+info_chinese$q62_social_media[info_chinese$col4==2] <- 1 
+info_chinese$q62_social_media[info_chinese$col5==2] <- 1 
+info_chinese$q62_social_media[info_chinese$col6==2] <- 1 
+### online_news 3
+info_chinese$q62_online_news <- rep(0, nrow(study_financing))
+info_chinese$q62_online_news[info_chinese$col1==3] <- 1 
+info_chinese$q62_online_news[info_chinese$col2==3] <- 1 
+info_chinese$q62_online_news[info_chinese$col3==3] <- 1 
+info_chinese$q62_online_news[info_chinese$col4==3] <- 1 
+info_chinese$q62_online_news[info_chinese$col5==3] <- 1 
+info_chinese$q62_online_news[info_chinese$col6==3] <- 1 
+### print_news 4
+info_chinese$q62_print_news <- rep(0, nrow(study_financing))
+info_chinese$q62_print_news[info_chinese$col1==4] <- 1 
+info_chinese$q62_print_news[info_chinese$col2==4] <- 1 
+info_chinese$q62_print_news[info_chinese$col3==4] <- 1 
+info_chinese$q62_print_news[info_chinese$col4==4] <- 1 
+info_chinese$q62_print_news[info_chinese$col5==4] <- 1 
+info_chinese$q62_print_news[info_chinese$col6==4] <- 1
+### own_observe 5
+info_chinese$q62_own_observe <- rep(0, nrow(study_financing))
+info_chinese$q62_own_observe[info_chinese$col1==5] <- 1 
+info_chinese$q62_own_observe[info_chinese$col2==5] <- 1 
+info_chinese$q62_own_observe[info_chinese$col3==5] <- 1 
+info_chinese$q62_own_observe[info_chinese$col4==5] <- 1 
+info_chinese$q62_own_observe[info_chinese$col5==5] <- 1 
+info_chinese$q62_own_observe[info_chinese$col6==5] <- 1
+### other 6
+info_chinese$q62_other <- rep(0, nrow(study_financing))
+info_chinese$q62_other[info_chinese$col1==6] <- 1 
+info_chinese$q62_other[info_chinese$col2==6] <- 1 
+info_chinese$q62_other[info_chinese$col3==6] <- 1 
+info_chinese$q62_other[info_chinese$col4==6] <- 1 
+info_chinese$q62_other[info_chinese$col5==6] <- 1 
+info_chinese$q62_other[info_chinese$col6==6] <- 1
+info_chinese <- info_chinese[ -c(2:7) ]
+characteristics_data <- left_join(characteristics_data, info_chinese, by=c("response_id"))
+characteristics_data <- characteristics_data %>% relocate(information_source_chinese_other, .after = q62_other)
+
+## create dummies for information_source_chinese_emplo
+info_chinese_employ <- subset(characteristics_data, select = c("response_id", "information_source_chinese_employers"))
+info_chinese_employ[c('col1', 'col2', "col3", "col4", "col5", "col6")] <- str_split_fixed(info_chinese_employ$information_source_chinese, ',', 6)
+info_chinese_employ <- info_chinese_employ[ -c(2) ]
+### friends 1
+info_chinese_employ$q133_friends <- rep(0, nrow(study_financing))
+info_chinese_employ$q133_friends[info_chinese_employ$col1==1] <- 1 
+info_chinese_employ$q133_friends[info_chinese_employ$col2==1] <- 1 
+info_chinese_employ$q133_friends[info_chinese_employ$col3==1] <- 1 
+info_chinese_employ$q133_friends[info_chinese_employ$col4==1] <- 1 
+info_chinese_employ$q133_friends[info_chinese_employ$col5==1] <- 1 
+info_chinese_employ$q133_friends[info_chinese_employ$col6==1] <- 1 
+### social media 2
+info_chinese_employ$q133_social_media <- rep(0, nrow(study_financing))
+info_chinese_employ$q133_social_media[info_chinese_employ$col1==2] <- 1 
+info_chinese_employ$q133_social_media[info_chinese_employ$col2==2] <- 1 
+info_chinese_employ$q133_social_media[info_chinese_employ$col3==2] <- 1 
+info_chinese_employ$q133_social_media[info_chinese_employ$col4==2] <- 1 
+info_chinese_employ$q133_social_media[info_chinese_employ$col5==2] <- 1 
+info_chinese_employ$q133_social_media[info_chinese_employ$col6==2] <- 1 
+### online_news 3
+info_chinese_employ$q133_online_news <- rep(0, nrow(study_financing))
+info_chinese_employ$q133_online_news[info_chinese_employ$col1==3] <- 1 
+info_chinese_employ$q133_online_news[info_chinese_employ$col2==3] <- 1 
+info_chinese_employ$q133_online_news[info_chinese_employ$col3==3] <- 1 
+info_chinese_employ$q133_online_news[info_chinese_employ$col4==3] <- 1 
+info_chinese_employ$q133_online_news[info_chinese_employ$col5==3] <- 1 
+info_chinese_employ$q133_online_news[info_chinese_employ$col6==3] <- 1 
+### print_news 4
+info_chinese_employ$q133_print_news <- rep(0, nrow(study_financing))
+info_chinese_employ$q133_print_news[info_chinese_employ$col1==4] <- 1 
+info_chinese_employ$q133_print_news[info_chinese_employ$col2==4] <- 1 
+info_chinese_employ$q133_print_news[info_chinese_employ$col3==4] <- 1 
+info_chinese_employ$q133_print_news[info_chinese_employ$col4==4] <- 1 
+info_chinese_employ$q133_print_news[info_chinese_employ$col5==4] <- 1 
+info_chinese_employ$q133_print_news[info_chinese_employ$col6==4] <- 1
+### own_observe 5
+info_chinese_employ$q133_own_observe <- rep(0, nrow(study_financing))
+info_chinese_employ$q133_own_observe[info_chinese_employ$col1==5] <- 1 
+info_chinese_employ$q133_own_observe[info_chinese_employ$col2==5] <- 1 
+info_chinese_employ$q133_own_observe[info_chinese_employ$col3==5] <- 1 
+info_chinese_employ$q133_own_observe[info_chinese_employ$col4==5] <- 1 
+info_chinese_employ$q133_own_observe[info_chinese_employ$col5==5] <- 1 
+info_chinese_employ$q133_own_observe[info_chinese_employ$col6==5] <- 1
+### other 6
+info_chinese_employ$q133_other <- rep(0, nrow(study_financing))
+info_chinese_employ$q133_other[info_chinese_employ$col1==6] <- 1 
+info_chinese_employ$q133_other[info_chinese_employ$col2==6] <- 1 
+info_chinese_employ$q133_other[info_chinese_employ$col3==6] <- 1 
+info_chinese_employ$q133_other[info_chinese_employ$col4==6] <- 1 
+info_chinese_employ$q133_other[info_chinese_employ$col5==6] <- 1 
+info_chinese_employ$q133_other[info_chinese_employ$col6==6] <- 1
+info_chinese_employ <- info_chinese_employ[ -c(2:7) ]
+characteristics_data <- left_join(characteristics_data, info_chinese_employ, by=c("response_id"))
+characteristics_data <- characteristics_data %>% relocate(information_source_chinese_employers_other, .after = q133_other)
+
+characteristics_data<- subset(characteristics_data, select = -c(study_financing, study_financing_before_graduation, longest_work_experience_duration, Second_longest_work_experience_duration, information_source_chinese, information_source_chinese_employers))
+
+```
+
+```{r}
+# merge the answer strongly agree/somewhat agree to agree and strongly disagree/somewhat disagree to disagree
+## then agree is 1, neutral is 2, disagree is 3
+
+#trust_1
+characteristics_data$trust_1[characteristics_data$trust_1 == 1 |characteristics_data$trust_1 == 4 ] <- 1
+characteristics_data$trust_1[characteristics_data$trust_1 == 3 |characteristics_data$trust_1 == 5 ] <- 3
+
+#trust_2 and reverse code
+characteristics_data$trust_2[characteristics_data$trust_2 == 1 |characteristics_data$trust_2 == 2 ] <- 6
+characteristics_data$trust_2[characteristics_data$trust_2 == 3 ] <- 2
+characteristics_data$trust_2[characteristics_data$trust_2 == 4 |characteristics_data$trust_2 == 5 ] <- 1
+characteristics_data$trust_2[characteristics_data$trust_2 == 6 ] <- 3
+
+#trust_3
+characteristics_data$trust_3[characteristics_data$trust_3 == 1 |characteristics_data$trust_3 == 2 ] <- 1
+characteristics_data$trust_3[characteristics_data$trust_3 == 3 ] <- 2
+characteristics_data$trust_3[characteristics_data$trust_3 == 4 |characteristics_data$trust_3 == 5 ] <- 3
+
+#trust_chinese_1
+characteristics_data$trust_chinese_1[characteristics_data$trust_chinese_1 == 1 |characteristics_data$trust_chinese_1 == 2 ] <- 1
+characteristics_data$trust_chinese_1[characteristics_data$trust_chinese_1 == 3 ] <- 2
+characteristics_data$trust_chinese_1[characteristics_data$trust_chinese_1 == 4 |characteristics_data$trust_chinese_1 == 5 ] <- 3
+
+#trust_chinese_2 and reverse code
+characteristics_data$trust_chinese_2[characteristics_data$trust_chinese_2 == 1 |characteristics_data$trust_chinese_2 == 2 ] <- 6
+characteristics_data$trust_chinese_2[characteristics_data$trust_chinese_2 == 3 ] <- 2
+characteristics_data$trust_chinese_2[characteristics_data$trust_chinese_2 == 4 |characteristics_data$trust_chinese_2 == 5 ] <- 1
+characteristics_data$trust_chinese_2[characteristics_data$trust_chinese_2 == 6 ] <- 3
+
+#trust_chinese_3
+characteristics_data$trust_chinese_3[characteristics_data$trust_chinese_3 == 1 |characteristics_data$trust_chinese_3 == 2 ] <- 1
+characteristics_data$trust_chinese_3[characteristics_data$trust_chinese_3 == 3 ] <- 2
+characteristics_data$trust_chinese_3[characteristics_data$trust_chinese_3 == 4 |characteristics_data$trust_chinese_3 == 5 ] <- 3
+
+## very important and fairly important will be one variable which is important, neutral, then slighly important and not important would be not_important
+
+# fair_salary
+characteristics_data$fair_salary[characteristics_data$fair_salary == 1 |characteristics_data$fair_salary == 3 ] <- 1
+characteristics_data$fair_salary[characteristics_data$fair_salary == 4 ] <- 2
+characteristics_data$fair_salary[characteristics_data$fair_salary == 5 |characteristics_data$fair_salary == 6 ] <- 3
+
+# favourable_contract_term
+characteristics_data$favourable_contract_term[characteristics_data$favourable_contract_term == 1 |characteristics_data$favourable_contract_term == 3 ] <- 1
+characteristics_data$favourable_contract_term[characteristics_data$favourable_contract_term == 4 ] <- 2
+characteristics_data$favourable_contract_term[characteristics_data$favourable_contract_term == 5 |characteristics_data$favourable_contract_term == 6 ] <- 3
+
+# future_development
+characteristics_data$future_development[characteristics_data$future_development == 1 |characteristics_data$future_development == 3 ] <- 1
+characteristics_data$future_development[characteristics_data$future_development == 4 ] <- 2
+characteristics_data$future_development[characteristics_data$future_development == 5 |characteristics_data$future_development == 6 ] <- 3
+
+# working_hours
+characteristics_data$working_hours[characteristics_data$working_hours == 1 |characteristics_data$working_hours == 3 ] <- 1
+characteristics_data$working_hours[characteristics_data$working_hours == 4 ] <- 2
+characteristics_data$working_hours[characteristics_data$working_hours == 5 |characteristics_data$working_hours == 6 ] <- 3
+
+# work_place_safety
+characteristics_data$work_place_safety[characteristics_data$work_place_safety == 1 |characteristics_data$work_place_safety == 3 ] <- 1
+characteristics_data$work_place_safety[characteristics_data$work_place_safety == 4 ] <- 2
+characteristics_data$work_place_safety[characteristics_data$work_place_safety == 5 |characteristics_data$work_place_safety == 6 ] <- 3
+
+# work_independently
+characteristics_data$work_independently[characteristics_data$work_independently == 1 |characteristics_data$work_independently == 3 ] <- 1
+characteristics_data$work_independently[characteristics_data$work_independently == 4 ] <- 2
+characteristics_data$work_independently[characteristics_data$work_independently == 5 |characteristics_data$work_independently == 6 ] <- 3
+
+# labor_laws
+characteristics_data$labor_laws[characteristics_data$labor_laws == 1 |characteristics_data$labor_laws == 3 ] <- 1
+characteristics_data$labor_laws[characteristics_data$labor_laws == 4 ] <- 2
+characteristics_data$labor_laws[characteristics_data$labor_laws == 5 |characteristics_data$labor_laws == 6 ] <- 3
+
+# corruption
+characteristics_data$corruption[characteristics_data$corruption == 1 |characteristics_data$corruption == 3 ] <- 1
+characteristics_data$corruption[characteristics_data$corruption == 4 ] <- 2
+characteristics_data$corruption[characteristics_data$corruption == 5 |characteristics_data$corruption == 6 ] <- 3
+
+# social_responsibility
+characteristics_data$social_responsibility[characteristics_data$social_responsibility == 1 |characteristics_data$social_responsibility == 3 ] <- 1
+characteristics_data$social_responsibility[characteristics_data$social_responsibility == 4 ] <- 2
+characteristics_data$social_responsibility[characteristics_data$social_responsibility == 5 |characteristics_data$social_responsibility == 6 ] <- 3
+
+# local_culture
+characteristics_data$local_culture[characteristics_data$local_culture == 1 |characteristics_data$local_culture == 3 ] <- 1
+characteristics_data$local_culture[characteristics_data$local_culture == 4 ] <- 2
+characteristics_data$local_culture[characteristics_data$local_culture == 5 |characteristics_data$local_culture == 6 ] <- 3
+
+# diversity_inclusion
+characteristics_data$diversity_inclusion[characteristics_data$diversity_inclusion == 1 |characteristics_data$diversity_inclusion == 3 ] <- 1
+characteristics_data$diversity_inclusion[characteristics_data$diversity_inclusion == 4 ] <- 2
+characteristics_data$diversity_inclusion[characteristics_data$diversity_inclusion == 5 |characteristics_data$diversity_inclusion == 6 ] <- 3
+
+# remane interaction_chinese_employer_friends_description to make sure it can appear in stata correctly
+colnames(characteristics_data)[colnames(characteristics_data) == "interaction_chinese_employer_friends_description"] = "interaction_ch_employ_fri_descrip"
+
+# reshape the risk variable
+characteristics_data$risk[characteristics_data$risk == 1 |characteristics_data$risk == 2| characteristics_data$risk == 3|characteristics_data$risk == 4] <- 1
+characteristics_data$risk[characteristics_data$risk == 5|characteristics_data$risk == 6 ] <- 2
+characteristics_data$risk[characteristics_data$risk == 7 |characteristics_data$risk == 8| characteristics_data$risk == 9|characteristics_data$risk == 10] <- 3
+```
+
+
+```{r}
+#-------------------------------------------------------------------------------
+# merge cs_data with characteristics dataset
+choice_data <- merge(cs_merge, characteristics_data, by=c("response_id"))
+
+# drop the variable response_id
+choice_data <- choice_data[ -c(1) ]
+
+# save data to csv file
+write.csv(choice_data, "choice_data.csv", row.names = FALSE)
+
+## create dataset that has dummies for choices
+# make choice to dummy instead of ranking
+choice_data_discrete <- choice_data %>%
+  mutate(rank = ifelse(ranking == 1, 1, 0)) %>%
+  select(!c("ranking"))
+
+# move ranking variable from last to first place
+choice_data_discrete <- choice_data_discrete %>% relocate(rank, .before =
+                                                            job_alternative)
+
+# rename variable
+# rename rank to ranking for consistency
+colnames(choice_data_discrete)[4] = "ranking"
+
+
+# save data
+write.csv(choice_data_discrete, "choice_data_discrete.csv", row.names = FALSE)
+
+```
+
